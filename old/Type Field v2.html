@@ -1,0 +1,1551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Type Field — animated typography · v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;700;900&family=Noto+Serif:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Noto+Serif+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Noto+Serif+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Noto+Serif+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Noto+Serif+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Recursive:slnt,wght@-15..0,300..1000&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg-0:#07070c;
+    --bg-1:#0c0b14;
+    --ink:#f3eee6;
+    --ink-soft:rgba(243,238,230,.62);
+    --ink-faint:rgba(243,238,230,.32);
+    --ink-ghost:rgba(243,238,230,.14);
+    --glass:rgba(18,16,28,.62);
+    --glass-stroke:rgba(255,255,255,.08);
+    --hairline:rgba(255,255,255,.06);
+    --accent:#c87cff;
+    --accent-2:#7fdcff;
+    --beat:#ff7a9c;
+    --serif:"Instrument Serif", "Iowan Old Style", Georgia, serif;
+    --sans:"Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono:"JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg-0);color:var(--ink);font-family:var(--sans);overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+
+  /* —————— Stage —————— */
+  #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:0 440px 0 60px;}
+  #stage.no-panel{padding:0 60px}
+  #stage::before{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(60% 50% at 30% 40%, rgba(200,124,255,.08), transparent 70%),
+      radial-gradient(50% 40% at 75% 70%, rgba(127,220,255,.05), transparent 70%);
+  }
+  #stage::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(0,0,0,.45) 100%);
+  }
+  .type-stage{
+    position:relative;z-index:1;
+    width:100%;max-width:1200px;
+    text-align:center;line-height:1.1;word-break:break-word;overflow-wrap:anywhere;
+    color:var(--ink);transition:transform .8s cubic-bezier(.2,.8,.2,1);
+  }
+  .type-stage .word{display:inline-block;white-space:nowrap;margin-right:.25em;vertical-align:baseline}
+  .type-stage .word:last-child{margin-right:0}
+  .type-stage .ch{display:inline-block;will-change:transform,opacity,filter;transform-origin:50% 65%;backface-visibility:hidden}
+  .type-stage .ch.space{width:.28em}
+
+  /* Crossfade: stage A/B layers */
+  .stage-layer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:inherit;pointer-events:none;opacity:0;transition:opacity .9s ease}
+  .stage-layer.active{opacity:1}
+  #stage .stage-layer{padding:0 440px 0 60px}
+  #stage.no-panel .stage-layer{padding:0 60px}
+
+  /* —————— Top chrome —————— */
+  .topbar{
+    position:fixed;top:0;left:0;right:0;z-index:5;
+    padding:18px 22px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+    pointer-events:none;
+  }
+  .brand{pointer-events:auto}
+  .brand .title{font-family:var(--serif);font-weight:400;font-size:24px;line-height:1.1;letter-spacing:.005em;white-space:nowrap}
+  .brand .title em{font-style:italic;color:var(--ink-soft)}
+  .brand .subtitle{margin-top:6px;font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:.18em;text-transform:uppercase}
+  .meta{pointer-events:auto;display:flex;gap:14px;align-items:center;font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:.16em;text-transform:uppercase}
+  .meta .dot{width:6px;height:6px;border-radius:50%;background:#9bd3a7;box-shadow:0 0 8px #9bd3a7;animation:pulse 2.4s ease-in-out infinite}
+  .meta .dot.beat{background:var(--beat);box-shadow:0 0 10px var(--beat);animation:none}
+  @keyframes pulse{0%,100%{opacity:.55}50%{opacity:1}}
+
+  /* —————— Panel —————— */
+  .panel{
+    position:fixed;z-index:4;
+    right:18px;top:64px;bottom:18px;width:400px;
+    background:var(--glass);
+    backdrop-filter:blur(22px) saturate(1.1);
+    -webkit-backdrop-filter:blur(22px) saturate(1.1);
+    border:1px solid var(--glass-stroke);border-radius:22px;
+    display:flex;flex-direction:column;
+    box-shadow:0 30px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.04);
+    overflow:hidden;
+    transition:transform .45s cubic-bezier(.2,.8,.2,1), opacity .3s;
+  }
+  .panel.closed{transform:translateX(calc(100% + 28px));opacity:0;pointer-events:none}
+
+  /* Quick-action bar at top of panel */
+  .quickbar{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:6px;
+    padding:14px 14px 12px;
+    border-bottom:1px solid var(--hairline);
+    background:linear-gradient(180deg, rgba(255,255,255,.025), transparent);
+  }
+  .qa{
+    appearance:none;border:1px solid var(--hairline);background:rgba(255,255,255,.04);color:var(--ink);
+    padding:10px 6px;border-radius:11px;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+    transition:background .15s, border-color .15s, transform .1s;font-family:var(--mono);
+  }
+  .qa:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18)}
+  .qa:active{transform:scale(.95)}
+  .qa svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6}
+  .qa span.lbl{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+  .qa.save{background:linear-gradient(135deg, rgba(199,124,255,.22), rgba(127,220,255,.14));border-color:rgba(199,124,255,.35)}
+  .qa.save:hover{background:linear-gradient(135deg, rgba(199,124,255,.32), rgba(127,220,255,.20))}
+
+  .panel-head{
+    padding:12px 18px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    border-bottom:1px solid var(--hairline);
+  }
+  .panel-head h2{margin:0;font-family:var(--serif);font-weight:400;font-size:17px}
+  .panel-head h2 em{color:var(--ink-soft)}
+  .panel-toggle{
+    display:inline-flex;align-items:center;gap:6px;border:1px solid var(--glass-stroke);background:transparent;color:var(--ink-soft);
+    border-radius:999px;padding:6px 12px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+    transition:background .2s,color .2s,border-color .2s;
+  }
+  .panel-toggle:hover{background:rgba(255,255,255,.05);color:var(--ink);border-color:rgba(255,255,255,.16)}
+  .panel-toggle.vj{border-color:rgba(199,124,255,.35);color:#e8d3ff;background:rgba(199,124,255,.08)}
+  .panel-toggle.vj:hover{background:rgba(199,124,255,.18)}
+
+  .reopen{
+    position:fixed;z-index:4;right:18px;top:64px;
+    border:1px solid var(--glass-stroke);background:var(--glass);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+    color:var(--ink-soft);border-radius:999px;padding:8px 14px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+    opacity:0;pointer-events:none;transition:opacity .3s;
+  }
+  .reopen.show{opacity:1;pointer-events:auto}
+  .reopen:hover{color:var(--ink);border-color:rgba(255,255,255,.18)}
+
+  .panel-body{flex:1;overflow-y:auto;padding:0 6px 16px 6px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.12) transparent;min-height:0}
+  .panel-body::-webkit-scrollbar{width:6px}
+  .panel-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
+
+  .section{padding:14px 14px 8px;border-bottom:1px solid var(--hairline)}
+  .section:last-child{border-bottom:none}
+  .section-title{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--ink-faint);margin:0 0 10px;display:flex;align-items:center;gap:8px;
+  }
+  .section-title::before{content:"";width:14px;height:1px;background:var(--ink-ghost)}
+  .section-title .badge{margin-left:auto;font-size:9px;color:var(--ink-soft);background:rgba(255,255,255,.05);border:1px solid var(--hairline);padding:2px 6px;border-radius:999px;letter-spacing:.12em}
+
+  /* Text input */
+  .text-input{
+    width:100%;background:rgba(255,255,255,.04);border:1px solid var(--hairline);color:var(--ink);
+    border-radius:11px;padding:11px 12px;font-family:var(--sans);font-size:14px;line-height:1.45;
+    outline:none;transition:border-color .2s,background .2s;resize:vertical;min-height:62px;max-height:160px;
+  }
+  .text-input::placeholder{color:rgba(243,238,230,.28);font-style:italic;font-family:var(--serif)}
+  .text-input:focus{border-color:rgba(199,124,255,.4);background:rgba(255,255,255,.06)}
+
+  /* Font select */
+  .font-group{display:flex;flex-direction:column;gap:8px}
+  .seg{display:flex;background:rgba(255,255,255,.03);border:1px solid var(--hairline);border-radius:10px;padding:3px;gap:2px}
+  .seg button{
+    flex:1;appearance:none;border:none;background:transparent;color:var(--ink-faint);
+    padding:7px 6px;border-radius:7px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+    transition:background .2s,color .2s;min-width:0;
+  }
+  .seg button:hover{color:var(--ink-soft)}
+  .seg button.active{background:rgba(255,255,255,.08);color:var(--ink)}
+
+  .lang-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+  .lang-grid button{
+    appearance:none;border:1px solid var(--hairline);background:rgba(255,255,255,.02);color:var(--ink-faint);
+    padding:9px 4px;border-radius:8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+    transition:background .2s,color .2s,border-color .2s;display:flex;flex-direction:column;align-items:center;gap:3px;
+  }
+  .lang-grid button .glyph{font-family:var(--sans);font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink-soft)}
+  .lang-grid button:hover{color:var(--ink-soft);border-color:rgba(255,255,255,.14)}
+  .lang-grid button.active{background:rgba(199,124,255,.12);color:var(--ink);border-color:rgba(199,124,255,.4)}
+  .lang-grid button.active .glyph{color:var(--ink)}
+
+  /* Anim chooser */
+  .anim-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+  .anim-card{
+    appearance:none;border:1px solid var(--hairline);background:rgba(255,255,255,.02);color:var(--ink-soft);
+    padding:10px 10px;border-radius:11px;cursor:pointer;text-align:left;
+    transition:background .2s,color .2s,border-color .2s;
+    display:flex;flex-direction:column;gap:4px;min-height:54px;position:relative;
+  }
+  .anim-card:hover{color:var(--ink);border-color:rgba(255,255,255,.16)}
+  .anim-card.active{background:rgba(199,124,255,.10);border-color:rgba(199,124,255,.45);color:var(--ink)}
+  .anim-card .name{font-family:var(--sans);font-size:12.5px}
+  .anim-card .zh{font-family:var(--serif);font-style:italic;color:var(--ink-faint);font-size:11.5px}
+  .anim-card.active .zh{color:var(--ink-soft)}
+
+  /* Sliders */
+  .slider-row{display:flex;flex-direction:column;gap:6px;padding:9px 0}
+  .slider-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .slider-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+  .slider-zh{font-family:var(--serif);font-style:italic;color:var(--ink-faint);font-size:11.5px;margin-left:6px}
+  .slider-value{font-family:var(--mono);font-size:10.5px;color:var(--ink);letter-spacing:.04em}
+  input[type="range"]{-webkit-appearance:none;appearance:none;width:100%;height:18px;background:transparent;cursor:pointer}
+  input[type="range"]::-webkit-slider-runnable-track{height:2px;background:linear-gradient(to right, rgba(199,124,255,.55) 0%, rgba(199,124,255,.55) var(--p,50%), rgba(255,255,255,.08) var(--p,50%));border-radius:2px}
+  input[type="range"]::-moz-range-track{height:2px;background:rgba(255,255,255,.08);border-radius:2px}
+  input[type="range"]::-moz-range-progress{height:2px;background:rgba(199,124,255,.55);border-radius:2px}
+  input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--ink);margin-top:-5px;box-shadow:0 0 0 4px rgba(199,124,255,.18);cursor:grab;transition:box-shadow .15s}
+  input[type="range"]::-webkit-slider-thumb:hover{box-shadow:0 0 0 6px rgba(199,124,255,.24)}
+  input[type="range"]::-moz-range-thumb{width:12px;height:12px;border:none;border-radius:50%;background:var(--ink);cursor:grab}
+
+  /* Color swatches */
+  .swatches{display:flex;gap:6px;flex-wrap:wrap}
+  .swatch{
+    width:26px;height:26px;border-radius:50%;border:1px solid var(--hairline);cursor:pointer;
+    transition:transform .15s,border-color .15s;
+  }
+  .swatch:hover{transform:scale(1.08);border-color:rgba(255,255,255,.25)}
+  .swatch.active{border-color:var(--ink);box-shadow:0 0 0 2px rgba(255,255,255,.08)}
+
+  /* Presets */
+  .preset-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+  .preset{
+    appearance:none;border:1px solid var(--hairline);background:rgba(255,255,255,.02);color:var(--ink);
+    padding:10px 12px;border-radius:11px;cursor:pointer;text-align:left;
+    display:flex;flex-direction:column;gap:4px;position:relative;
+    transition:background .15s,border-color .15s,transform .1s;min-height:58px;
+  }
+  .preset:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18)}
+  .preset:active{transform:scale(.98)}
+  .preset.user::after{content:"USER";position:absolute;top:6px;right:8px;font-family:var(--mono);font-size:8px;color:var(--ink-faint);letter-spacing:.14em}
+  .preset .pname{font-family:var(--serif);font-size:14px;line-height:1.1}
+  .preset .ptag{font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);letter-spacing:.12em;text-transform:uppercase}
+  .preset .pswatch{position:absolute;left:-1px;top:-1px;bottom:-1px;width:4px;border-radius:11px 0 0 11px;background:var(--swatch,#c87cff)}
+
+  /* Audio */
+  .audio-controls{display:flex;gap:6px;align-items:center}
+  .audio-controls .btn{flex:1}
+  .audio-controls input[type="file"]{display:none}
+  .vibe-box{
+    margin-top:10px;padding:10px 12px;border:1px solid var(--hairline);background:rgba(255,255,255,.02);border-radius:11px;
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .vibe-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .vibe-name{font-family:var(--serif);font-size:16px;font-style:italic}
+  .vibe-conf{font-family:var(--mono);font-size:10px;color:var(--ink-faint);letter-spacing:.12em;text-transform:uppercase}
+  .vibe-stats{display:flex;gap:10px;font-family:var(--mono);font-size:10px;color:var(--ink-soft);letter-spacing:.08em}
+  .vibe-stats .stat b{color:var(--ink);font-weight:500;margin-right:4px}
+  .spectrum{height:32px;width:100%;display:block;background:rgba(0,0,0,.25);border-radius:6px;margin-top:6px}
+  .vibe-toggles{display:flex;gap:6px;margin-top:8px}
+  .pill{
+    flex:1;appearance:none;border:1px solid var(--hairline);background:rgba(255,255,255,.03);color:var(--ink-soft);
+    border-radius:999px;padding:7px 10px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+    transition:background .15s,color .15s,border-color .15s;display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  }
+  .pill:hover{background:rgba(255,255,255,.06);color:var(--ink)}
+  .pill.on{background:rgba(199,124,255,.16);color:var(--ink);border-color:rgba(199,124,255,.4)}
+  .pill .dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.6}
+  .pill.on .dot{opacity:1;box-shadow:0 0 6px currentColor}
+
+  /* Buttons */
+  .actions{display:flex;gap:6px;padding-top:6px}
+  .btn{
+    appearance:none;border:1px solid var(--hairline);background:rgba(255,255,255,.03);color:var(--ink-soft);
+    padding:9px 12px;border-radius:9px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+    transition:background .15s,color .15s,border-color .15s;flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .btn:hover{background:rgba(255,255,255,.06);color:var(--ink);border-color:rgba(255,255,255,.16)}
+  .btn.primary{background:linear-gradient(135deg,#7fdcff,#c87cff);color:#0e0c16;border-color:transparent;font-weight:500}
+  .btn.primary:hover{filter:brightness(1.08)}
+
+  .hint{font-family:var(--serif);font-style:italic;color:var(--ink-faint);font-size:11.5px;line-height:1.45;padding:2px 0 0}
+
+  /* Toast */
+  .toast{
+    position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(20px);
+    background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--glass-stroke);border-radius:999px;padding:10px 18px;
+    color:var(--ink);font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    z-index:50;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ——————————— VJ Dashboard ——————————— */
+  .vj{
+    position:fixed;inset:0;z-index:20;background:rgba(7,7,12,.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    display:flex;flex-direction:column;opacity:0;pointer-events:none;
+    transition:opacity .4s ease;
+  }
+  .vj.show{opacity:1;pointer-events:auto}
+  .vj-head{
+    display:flex;justify-content:space-between;align-items:center;padding:22px 30px 16px;border-bottom:1px solid var(--hairline);
+  }
+  .vj-head .title{font-family:var(--serif);font-size:28px;line-height:1.1}
+  .vj-head .title em{color:var(--ink-soft);font-style:italic}
+  .vj-head .sub{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:.18em;text-transform:uppercase;margin-top:4px}
+  .vj-now{
+    display:flex;gap:18px;align-items:center;font-family:var(--mono);font-size:11px;color:var(--ink-soft);letter-spacing:.12em;text-transform:uppercase;
+  }
+  .vj-now .now-name{font-family:var(--serif);font-style:italic;color:var(--ink);font-size:14px;letter-spacing:0;text-transform:none}
+  .vj-close{
+    appearance:none;border:1px solid var(--glass-stroke);background:rgba(255,255,255,.04);color:var(--ink-soft);
+    border-radius:999px;padding:9px 16px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+    transition:all .2s;
+  }
+  .vj-close:hover{background:rgba(255,255,255,.08);color:var(--ink)}
+  .vj-grid{
+    flex:1;overflow-y:auto;padding:24px 30px 30px;
+    display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:14px;align-content:start;
+  }
+  .vj-tile{
+    appearance:none;border:1px solid var(--hairline);background:rgba(255,255,255,.02);color:var(--ink);
+    border-radius:14px;cursor:pointer;text-align:left;overflow:hidden;position:relative;
+    height:150px;display:flex;flex-direction:column;justify-content:space-between;padding:14px;
+    transition:transform .15s, border-color .15s, background .15s;
+  }
+  .vj-tile:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.04)}
+  .vj-tile.active{border-color:rgba(199,124,255,.6);background:rgba(199,124,255,.10);box-shadow:0 0 0 1px rgba(199,124,255,.4), 0 10px 30px rgba(199,124,255,.18)}
+  .vj-tile .tile-preview{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:42px;color:rgba(255,255,255,.92);
+    pointer-events:none;overflow:hidden;
+  }
+  .vj-tile .tile-name{
+    position:relative;z-index:1;font-family:var(--serif);font-size:15px;line-height:1.05;
+    text-shadow:0 1px 12px rgba(0,0,0,.7);align-self:flex-start;
+    background:rgba(0,0,0,.35);padding:4px 8px;border-radius:6px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  }
+  .vj-tile .tile-meta{
+    position:relative;z-index:1;font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);
+    display:flex;justify-content:space-between;
+    background:rgba(0,0,0,.35);padding:4px 8px;border-radius:6px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  }
+  .vj-tile .tile-key{
+    position:absolute;top:10px;right:10px;z-index:2;
+    width:22px;height:22px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.45);
+    display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--ink-soft);
+  }
+  .vj-foot{
+    border-top:1px solid var(--hairline);padding:14px 30px;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap;
+    background:rgba(0,0,0,.25);
+  }
+  .vj-foot .keys{display:flex;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);align-items:center;flex-wrap:wrap}
+  .vj-foot .keys kbd{font-family:var(--mono);font-size:9.5px;background:rgba(255,255,255,.06);border:1px solid var(--hairline);padding:2px 6px;border-radius:4px;color:var(--ink-soft)}
+  .vj-foot .fade{display:flex;gap:8px;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);min-width:240px;flex:1}
+  .vj-foot .fade input[type="range"]{flex:1;min-width:120px}
+
+  /* —————— Responsive —————— */
+  @media (max-width: 900px){
+    #stage{padding:80px 24px 38vh 24px}
+    #stage .stage-layer{padding:80px 24px 38vh 24px}
+    .panel{left:12px;right:12px;top:auto;bottom:12px;width:auto;height:38vh;border-radius:18px}
+    .panel.closed{transform:translateY(calc(100% + 24px));opacity:0}
+    .reopen{left:auto;right:18px;top:auto;bottom:18px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ——————— Stage ——————— -->
+<div id="stage" aria-hidden="false">
+  <div class="stage-layer active" id="layerA">
+    <div class="type-stage" id="typeA"></div>
+  </div>
+  <div class="stage-layer" id="layerB">
+    <div class="type-stage" id="typeB"></div>
+  </div>
+</div>
+
+<!-- ——————— Top chrome ——————— -->
+<div class="topbar">
+  <div class="brand">
+    <div class="title">Type <em>Field</em></div>
+    <div class="subtitle">Animated typography · vj playground</div>
+  </div>
+  <div class="meta">
+    <span class="dot" id="statusDot"></span>
+    <span id="status">Live · Sans · Latin</span>
+  </div>
+</div>
+
+<button class="reopen" id="reopen">Open Panel</button>
+
+<!-- ——————— Control panel ——————— -->
+<aside class="panel" id="panel">
+  <!-- Quick actions at the top -->
+  <div class="quickbar">
+    <button class="qa" id="qaRandom" title="Randomize (R)">
+      <svg viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M21 3l-7.5 7.5"/><path d="M8 21H3v-5"/><path d="M3 21l7.5-7.5"/><path d="M21 16v5h-5"/><path d="M14 14l7 7"/><path d="M3 3l7 7"/></svg>
+      <span class="lbl">Random</span>
+    </button>
+    <button class="qa" id="qaReset" title="Reset to defaults">
+      <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/></svg>
+      <span class="lbl">Reset</span>
+    </button>
+    <button class="qa" id="qaExport" title="Save as PNG">
+      <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+      <span class="lbl">Export</span>
+    </button>
+    <button class="qa save" id="qaSave" title="Save current as preset">
+      <svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6.2.8-4.6 4.3 1.2 6.1L12 17l-5.4 2.8 1.2-6.1L3.2 9.4l6.2-.8L12 3z"/></svg>
+      <span class="lbl">Save Preset</span>
+    </button>
+  </div>
+
+  <div class="panel-head">
+    <h2>Field <em>controls</em></h2>
+    <div style="display:flex;gap:6px">
+      <button class="panel-toggle vj" id="vjBtn">VJ ⌃</button>
+      <button class="panel-toggle" id="closeBtn">Close</button>
+    </div>
+  </div>
+
+  <div class="panel-body">
+
+    <!-- Text -->
+    <section class="section">
+      <h3 class="section-title">Text · 文字</h3>
+      <textarea class="text-input" id="textInput" rows="2" placeholder="Type anything · 輸入任何文字…">輕輕呼吸  ·  breathe softly</textarea>
+      <div class="hint">Mix scripts freely — EN · 中文 · 日本語 · 한글.</div>
+    </section>
+
+    <!-- Presets -->
+    <section class="section">
+      <h3 class="section-title">Presets · 預設 <span class="badge" id="presetBadge">12</span></h3>
+      <div class="preset-grid" id="presetGrid"></div>
+      <div class="hint" id="userHint" style="display:none">User-saved presets appear here. Long-press to delete.</div>
+    </section>
+
+    <!-- Font -->
+    <section class="section">
+      <h3 class="section-title">Font · 字體</h3>
+      <div class="font-group">
+        <div class="seg" id="familySeg">
+          <button data-family="sans" class="active">Sans</button>
+          <button data-family="serif">Serif</button>
+          <button data-family="recursive">Recursive <span style="opacity:.5">·var</span></button>
+        </div>
+        <div class="lang-grid" id="langGrid">
+          <button data-lang="latin" class="active"><span class="glyph">Aa</span><span>Latin</span></button>
+          <button data-lang="sc"><span class="glyph">简</span><span>S Chinese</span></button>
+          <button data-lang="tc"><span class="glyph">繁</span><span>T Chinese</span></button>
+          <button data-lang="jp"><span class="glyph">あ</span><span>Japanese</span></button>
+          <button data-lang="kr"><span class="glyph">한</span><span>Korean</span></button>
+        </div>
+        <div class="slider-row">
+          <div class="slider-head"><span class="slider-label">Size <span class="slider-zh">字級</span></span><span class="slider-value" id="sizeVal">120</span></div>
+          <input id="size" type="range" min="32" max="240" value="120" />
+        </div>
+        <div class="slider-row">
+          <div class="slider-head"><span class="slider-label">Weight <span class="slider-zh">字重</span></span><span class="slider-value" id="weightVal">400</span></div>
+          <input id="weight" type="range" min="300" max="900" step="100" value="400" />
+        </div>
+        <div class="slider-row">
+          <div class="slider-head"><span class="slider-label">Tracking <span class="slider-zh">字距</span></span><span class="slider-value" id="trackVal">0.000</span></div>
+          <input id="track" type="range" min="-0.05" max="0.4" step="0.005" value="0" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Animation -->
+    <section class="section">
+      <h3 class="section-title">Animation · 動畫</h3>
+      <div class="anim-grid" id="animGrid">
+        <button class="anim-card active" data-anim="breathe"><span class="name">Breathe</span><span class="zh">呼吸 · brightness pulse</span></button>
+        <button class="anim-card" data-anim="wave"><span class="name">Wave</span><span class="zh">波浪 · vertical sine</span></button>
+        <button class="anim-card" data-anim="twist"><span class="name">Twist</span><span class="zh">扭動 · rotate &amp; skew</span></button>
+        <button class="anim-card" data-anim="typewriter"><span class="name">Typewriter</span><span class="zh">打字機 · stagger in</span></button>
+        <button class="anim-card" data-anim="flow"><span class="name">Flow</span><span class="zh">流動 · opacity travels</span></button>
+        <button class="anim-card" data-anim="weight"><span class="name">Weight wave</span><span class="zh">字重波 · variable axis</span></button>
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-head"><span class="slider-label">Speed <span class="slider-zh">速度</span></span><span class="slider-value" id="speedVal">1.00×</span></div>
+        <input id="speed" type="range" min="0.1" max="3" step="0.05" value="1" />
+      </div>
+      <div class="slider-row">
+        <div class="slider-head"><span class="slider-label">Amplitude <span class="slider-zh">幅度</span></span><span class="slider-value" id="ampVal">0.60</span></div>
+        <input id="amp" type="range" min="0" max="1" step="0.01" value="0.6" />
+      </div>
+      <div class="slider-row">
+        <div class="slider-head"><span class="slider-label">Spread <span class="slider-zh">字間相位</span></span><span class="slider-value" id="spreadVal">0.18</span></div>
+        <input id="spread" type="range" min="0" max="1" step="0.01" value="0.18" />
+        <div class="hint" style="padding:0;margin-top:-2px">Phase offset between characters. 0 = synced, 1 = wide stagger.</div>
+      </div>
+      <div class="slider-row">
+        <div class="slider-head"><span class="slider-label">Softness <span class="slider-zh">柔和度</span></span><span class="slider-value" id="softVal">0.50</span></div>
+        <input id="softness" type="range" min="0.05" max="1" step="0.01" value="0.5" />
+        <div class="hint" style="padding:0;margin-top:-2px">For Flow: width of the bright spotlight.</div>
+      </div>
+    </section>
+
+    <!-- Color -->
+    <section class="section">
+      <h3 class="section-title">Color · 顏色</h3>
+      <div class="swatches" id="swatches">
+        <button class="swatch active" data-color="#f3eee6" style="background:#f3eee6" title="Bone"></button>
+        <button class="swatch" data-color="#ffffff" style="background:#ffffff" title="White"></button>
+        <button class="swatch" data-color="#c87cff" style="background:#c87cff" title="Violet"></button>
+        <button class="swatch" data-color="#7fdcff" style="background:#7fdcff" title="Sky"></button>
+        <button class="swatch" data-color="#9bd3a7" style="background:#9bd3a7" title="Sage"></button>
+        <button class="swatch" data-color="#ffb27a" style="background:#ffb27a" title="Amber"></button>
+        <button class="swatch" data-color="#ff7a9c" style="background:#ff7a9c" title="Rose"></button>
+        <button class="swatch" data-color="#7a6bff" style="background:#7a6bff" title="Indigo"></button>
+      </div>
+    </section>
+
+    <!-- Audio + Vibe -->
+    <section class="section">
+      <h3 class="section-title">Audio · 音樂判讀 <span class="badge" id="audioBadge">off</span></h3>
+      <div class="audio-controls">
+        <label class="btn" for="audioFile" id="audioFileBtn">♪ Load File</label>
+        <input id="audioFile" type="file" accept="audio/*" />
+        <button class="btn" id="micBtn">⌬ Mic</button>
+        <button class="btn" id="audioStop">■ Stop</button>
+      </div>
+      <div class="vibe-box">
+        <div class="vibe-row">
+          <span class="vibe-name" id="vibeName">— No input —</span>
+          <span class="vibe-conf" id="vibeConf">idle</span>
+        </div>
+        <div class="vibe-stats">
+          <span class="stat"><b id="bpmVal">—</b>BPM</span>
+          <span class="stat"><b id="energyVal">—</b>Energy</span>
+          <span class="stat"><b id="bassVal">—</b>Bass</span>
+          <span class="stat"><b id="trebleVal">—</b>High</span>
+        </div>
+        <canvas class="spectrum" id="spectrum" width="600" height="64"></canvas>
+        <div class="vibe-toggles">
+          <button class="pill on" id="autoVibeBtn"><span class="dot"></span>Auto-style</button>
+          <button class="pill" id="beatSyncBtn"><span class="dot"></span>Beat sync</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</aside>
+
+<!-- ——————— VJ Dashboard ——————— -->
+<section class="vj" id="vj" aria-hidden="true">
+  <div class="vj-head">
+    <div>
+      <div class="title">VJ <em>dashboard</em></div>
+      <div class="sub">Tap a tile or press the key to switch · ⇥ Escape closes</div>
+    </div>
+    <div class="vj-now">
+      <span>Now playing</span>
+      <span class="now-name" id="vjNowName">Breathe</span>
+    </div>
+    <button class="vj-close" id="vjClose">Close</button>
+  </div>
+  <div class="vj-grid" id="vjGrid"></div>
+  <div class="vj-foot">
+    <div class="keys">
+      <span>Switch</span>
+      <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>…</kbd><kbd>9</kbd>
+      <span style="margin-left:14px">Random</span><kbd>R</kbd>
+      <span style="margin-left:14px">Pause</span><kbd>Space</kbd>
+      <span style="margin-left:14px">Close</span><kbd>Esc</kbd>
+    </div>
+    <div class="fade">
+      <span>Crossfade</span>
+      <input id="vjFade" type="range" min="0.2" max="3" step="0.1" value="0.9" />
+      <span id="vjFadeVal">0.9s</span>
+    </div>
+  </div>
+</section>
+
+<!-- Toast -->
+<div class="toast" id="toast">Saved.</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════
+   TYPE FIELD v2 — main app
+   ──────────────────────────────────────────────────────────────────────── */
+(() => {
+
+/* —————————————————————————————————————————————————————————————————————
+   FONT STACKS
+   ————————————————————————————————————————————————————————————————————— */
+const FONT = {
+  sans:{
+    latin:'"Noto Sans", system-ui, sans-serif',
+    sc:'"Noto Sans SC", "Noto Sans", sans-serif',
+    tc:'"Noto Sans TC", "Noto Sans", sans-serif',
+    jp:'"Noto Sans JP", "Noto Sans", sans-serif',
+    kr:'"Noto Sans KR", "Noto Sans", sans-serif',
+  },
+  serif:{
+    latin:'"Noto Serif", "Iowan Old Style", Georgia, serif',
+    sc:'"Noto Serif SC", "Noto Serif", serif',
+    tc:'"Noto Serif TC", "Noto Serif", serif',
+    jp:'"Noto Serif JP", "Noto Serif", serif',
+    kr:'"Noto Serif KR", "Noto Serif", serif',
+  },
+  recursive:{
+    latin:'"Recursive", system-ui, sans-serif',
+    sc:'"Recursive", "Noto Sans SC", sans-serif',
+    tc:'"Recursive", "Noto Sans TC", sans-serif',
+    jp:'"Recursive", "Noto Sans JP", sans-serif',
+    kr:'"Recursive", "Noto Sans KR", sans-serif',
+  },
+};
+
+/* —————————————————————————————————————————————————————————————————————
+   PRESETS  (built-in)
+   ————————————————————————————————————————————————————————————————————— */
+const BUILTIN_PRESETS = [
+  { name:"Soft Breath",  zh:"輕呼吸",    state:{ anim:"breathe",    family:"serif",     lang:"latin", size:140, weight:300, track:0.02, speed:0.6, amp:0.55, spread:0.04, softness:0.5, color:"#f3eee6", text:"breathe softly" } },
+  { name:"Neon Pulse",   zh:"霓虹脈動",  state:{ anim:"flow",       family:"recursive", lang:"latin", size:130, weight:700, track:0.04, speed:1.6, amp:0.85, spread:0.30, softness:0.35,color:"#c87cff", text:"NEON · 霓虹" } },
+  { name:"Wave Dream",   zh:"波浪夢",    state:{ anim:"wave",       family:"serif",     lang:"latin", size:130, weight:400, track:0.01, speed:0.9, amp:0.55, spread:0.24, softness:0.5, color:"#7fdcff", text:"riding the tide" } },
+  { name:"Glitch",       zh:"扭曲",      state:{ anim:"twist",      family:"recursive", lang:"latin", size:120, weight:800, track:0.06, speed:1.8, amp:0.7,  spread:0.20, softness:0.5, color:"#ff7a9c", text:"GLITCH/扭曲" } },
+  { name:"Ambient Drift",zh:"環境漂浮",  state:{ anim:"breathe",    family:"serif",     lang:"jp",    size:150, weight:300, track:0.06, speed:0.35,amp:0.45, spread:0.10, softness:0.5, color:"#9bd3a7", text:"ゆっくりと" } },
+  { name:"Hyperpop",     zh:"超流行",    state:{ anim:"typewriter", family:"sans",      lang:"latin", size:115, weight:900, track:0.03, speed:2.2, amp:1.0,  spread:0.0,  softness:0.5, color:"#ff7a9c", text:"hyper pop!!!" } },
+  { name:"Lo-fi",        zh:"低保真",    state:{ anim:"breathe",    family:"serif",     lang:"latin", size:120, weight:400, track:0.04, speed:0.5, amp:0.4,  spread:0.16, softness:0.5, color:"#ffb27a", text:"chill beats" } },
+  { name:"Vapor",        zh:"蒸氣",      state:{ anim:"wave",       family:"sans",      lang:"jp",    size:130, weight:400, track:0.12, speed:0.6, amp:0.4,  spread:0.32, softness:0.5, color:"#7fdcff", text:"蒸気 · vapor" } },
+  { name:"Cinematic",    zh:"電影",      state:{ anim:"flow",       family:"serif",     lang:"latin", size:110, weight:400, track:0.18, speed:0.4, amp:0.7,  spread:0.45, softness:0.7, color:"#f3eee6", text:"INT. NIGHT — exterior" } },
+  { name:"Meditation",   zh:"冥想",      state:{ anim:"flow",       family:"serif",     lang:"sc",    size:160, weight:300, track:0.10, speed:0.25,amp:0.55, spread:0.20, softness:0.85,color:"#9bd3a7", text:"一念 · 萬念" } },
+  { name:"Heavy",        zh:"重低音",    state:{ anim:"weight",     family:"recursive", lang:"latin", size:140, weight:700, track:0.0,  speed:0.9, amp:0.9,  spread:0.15, softness:0.5, color:"#ffb27a", text:"BASS · 重低音" } },
+  { name:"Disco",        zh:"迪斯可",    state:{ anim:"weight",     family:"recursive", lang:"latin", size:130, weight:600, track:0.04, speed:1.7, amp:0.95, spread:0.28, softness:0.5, color:"#c87cff", text:"DISCO INFERNO" } },
+  { name:"Type Code",    zh:"打字機",    state:{ anim:"typewriter", family:"recursive", lang:"latin", size:90,  weight:500, track:0.02, speed:1.2, amp:0.95, spread:0.0,  softness:0.5, color:"#9bd3a7", text:"hello world();" } },
+  { name:"Cherry",       zh:"櫻",        state:{ anim:"wave",       family:"serif",     lang:"jp",    size:170, weight:400, track:0.05, speed:0.7, amp:0.5,  spread:0.20, softness:0.5, color:"#ff7a9c", text:"桜が舞う" } },
+  { name:"Han River",    zh:"한강",      state:{ anim:"breathe",    family:"serif",     lang:"kr",    size:150, weight:500, track:0.04, speed:0.55,amp:0.55, spread:0.12, softness:0.5, color:"#7fdcff", text:"한강의 밤" } },
+  { name:"Code Wave",    zh:"碼浪",      state:{ anim:"weight",     family:"recursive", lang:"latin", size:100, weight:500, track:0.0,  speed:1.1, amp:0.8,  spread:0.20, softness:0.5, color:"#7fdcff", text:"function dream() {" } },
+];
+
+/* —————————————————————————————————————————————————————————————————————
+   VIBE → PRESET MAP (used by audio auto-style)
+   ————————————————————————————————————————————————————————————————————— */
+const VIBE_PRESETS = {
+  Ambient:    "Ambient Drift",
+  Dance:      "Neon Pulse",
+  HipHop:     "Heavy",
+  Pop:        "Hyperpop",
+  LoFi:       "Lo-fi",
+  Cinematic:  "Cinematic",
+  Rock:       "Glitch",
+};
+
+/* —————————————————————————————————————————————————————————————————————
+   STATE
+   ————————————————————————————————————————————————————————————————————— */
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "text": "幹你娘",
+  "family": "serif",
+  "lang": "latin",
+  "size": 120,
+  "weight": 400,
+  "track": 0,
+  "anim": "breathe",
+  "speed": 1,
+  "amp": 0.6,
+  "spread": 0.18,
+  "softness": 0.5,
+  "color": "#c87cff",
+  "autoVibe": true,
+  "beatSync": false
+}/*EDITMODE-END*/;
+
+const state = { ...TWEAKS, paused:false };
+
+// Active layer (for crossfade): A or B
+let activeLayer = 'A';
+let stageA, stageB;
+let charsA = [], charsB = [];
+let startTime = performance.now();
+let pausedAt = 0;
+let pauseOffset = 0;
+let crossfadeDuration = 0.9; // seconds, set from VJ control
+
+// User presets (localStorage)
+const USER_KEY = "type-field-user-presets-v1";
+let userPresets = [];
+try { userPresets = JSON.parse(localStorage.getItem(USER_KEY) || "[]"); } catch(_) { userPresets = []; }
+
+/* —————————————————————————————————————————————————————————————————————
+   DOM refs
+   ————————————————————————————————————————————————————————————————————— */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+stageA = $("#typeA");
+stageB = $("#typeB");
+const layerA = $("#layerA"), layerB = $("#layerB");
+const statusEl = $("#status");
+const panel = $("#panel");
+const reopen = $("#reopen");
+const closeBtn = $("#closeBtn");
+const vjBtn = $("#vjBtn");
+const textInput = $("#textInput");
+const toast = $("#toast");
+const presetGrid = $("#presetGrid");
+const presetBadge = $("#presetBadge");
+
+/* —————————————————————————————————————————————————————————————————————
+   Text builder
+   ————————————————————————————————————————————————————————————————————— */
+function buildText(stageEl, t){
+  stageEl.innerHTML = '';
+  const arr = [];
+  const tokens = t.split(/(\s+)/);
+  let charIdx = 0;
+  tokens.forEach(tok => {
+    if(tok === '') return;
+    if(/^\s+$/.test(tok)){
+      const sp = document.createElement('span');
+      sp.className = 'ch space';
+      stageEl.appendChild(sp);
+      return;
+    }
+    const isLatin = (c) => /[A-Za-z0-9'\-]/.test(c);
+    let i = 0;
+    while(i < tok.length){
+      if(isLatin(tok[i])){
+        const word = document.createElement('span');
+        word.className = 'word';
+        while(i < tok.length && isLatin(tok[i])){
+          const ch = document.createElement('span');
+          ch.className = 'ch';
+          ch.textContent = tok[i];
+          ch.dataset.i = charIdx;
+          word.appendChild(ch);
+          arr.push({el:ch, i:charIdx});
+          charIdx++; i++;
+        }
+        stageEl.appendChild(word);
+      } else {
+        const ch = document.createElement('span');
+        ch.className = 'ch';
+        ch.textContent = tok[i];
+        ch.dataset.i = charIdx;
+        stageEl.appendChild(ch);
+        arr.push({el:ch, i:charIdx});
+        charIdx++; i++;
+      }
+    }
+  });
+  return arr;
+}
+
+function rebuildAll(){
+  charsA = buildText(stageA, state.text || " ");
+  charsB = buildText(stageB, state.text || " ");
+  applyStaticStyles();
+}
+
+/* —————————————————————————————————————————————————————————————————————
+   Static (non-animated) styling
+   ————————————————————————————————————————————————————————————————————— */
+function applyStaticStyles(){
+  const fontStack = (FONT[state.family] && FONT[state.family][state.lang]) || FONT.sans.latin;
+  [stageA, stageB].forEach(s => {
+    s.style.fontFamily = fontStack;
+    s.style.fontSize = state.size + 'px';
+    s.style.color = state.color;
+    s.style.letterSpacing = state.track + 'em';
+    s.style.fontWeight = state.weight;
+    if(state.family === 'recursive'){
+      s.style.fontVariationSettings = `"wght" ${state.weight}, "slnt" 0`;
+    } else {
+      s.style.fontVariationSettings = 'normal';
+    }
+  });
+  const famLabel = state.family === 'recursive' ? 'Recursive · var'
+                  : state.family === 'serif' ? 'Noto Serif' : 'Noto Sans';
+  const langLabel = ({latin:'Latin', sc:'简体', tc:'繁體', jp:'日本語', kr:'한글'})[state.lang] || '';
+  statusEl.textContent = `Live · ${famLabel} · ${langLabel}`;
+}
+
+/* —————————————————————————————————————————————————————————————————————
+   Per-frame animation
+   ————————————————————————————————————————————————————————————————————— */
+let beatBoost = 0; // transient boost from beat detection
+function applyAnim(chars, t){
+  const n = chars.length;
+  if(!n) return;
+  const speed = state.speed;
+  const amp = Math.min(1, state.amp + beatBoost*0.4);
+  const spread = state.spread;
+  const soft = state.softness;
+  const anim = state.anim;
+
+  for(let k=0;k<n;k++){
+    const c = chars[k];
+    const i = c.i;
+    const phase = i * spread;
+
+    switch(anim){
+      case 'breathe': {
+        const v = 0.5 + 0.5*Math.sin((t*speed*1.4 - phase) * Math.PI);
+        const op = 1 - amp + amp*v;
+        c.el.style.opacity = op.toFixed(3);
+        c.el.style.transform = 'translateZ(0)';
+        c.el.style.filter = `brightness(${(0.6 + 0.5*v).toFixed(3)})`;
+        c.el.style.fontVariationSettings = '';
+        break;
+      }
+      case 'wave': {
+        const y = Math.sin((t*speed*1.6 - phase*1.2) * Math.PI) * amp * (state.size*0.18);
+        c.el.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`;
+        c.el.style.opacity = '1';
+        c.el.style.filter = '';
+        c.el.style.fontVariationSettings = '';
+        break;
+      }
+      case 'twist': {
+        const rot = Math.sin((t*speed*1.2 - phase) * Math.PI) * amp * 22;
+        const sk  = Math.cos((t*speed*1.0 - phase*0.8) * Math.PI) * amp * 8;
+        c.el.style.transform = `rotate(${rot.toFixed(2)}deg) skewX(${sk.toFixed(2)}deg)`;
+        c.el.style.opacity = '1';
+        c.el.style.filter = '';
+        if(state.family === 'recursive'){
+          const slant = -Math.abs(Math.sin((t*speed*1.2 - phase) * Math.PI)) * amp * 14;
+          c.el.style.fontVariationSettings = `"wght" ${state.weight}, "slnt" ${slant.toFixed(2)}`;
+        } else {
+          c.el.style.fontVariationSettings = '';
+        }
+        break;
+      }
+      case 'typewriter': {
+        const cycle = n + Math.max(4, n*0.4);
+        const cursorPos = ((t*speed*6) % cycle);
+        let op = 0;
+        if(cursorPos > cycle - n*0.3){
+          const tail = cursorPos - (cycle - n*0.3);
+          const fadeStart = tail / (n*0.3) * n;
+          op = i < fadeStart ? Math.max(0, 1 - (fadeStart - i)) : 1;
+        } else {
+          op = i < cursorPos ? 1 : (i < cursorPos + 1 ? (cursorPos - i) : 0);
+        }
+        const minOp = 1 - amp;
+        op = minOp + (1-minOp)*op;
+        c.el.style.opacity = op.toFixed(3);
+        c.el.style.transform = '';
+        c.el.style.filter = '';
+        c.el.style.fontVariationSettings = '';
+        break;
+      }
+      case 'flow': {
+        const head = ((t*speed*0.7) % 1) * (n + n*0.4) - n*0.2;
+        const dist = i - head;
+        const width = Math.max(0.3, soft * n * 0.5 + 0.5);
+        const g = Math.exp(-(dist*dist)/(2*width*width));
+        const base = 1 - amp;
+        const op = base + (1-base) * g;
+        c.el.style.opacity = op.toFixed(3);
+        c.el.style.transform = '';
+        c.el.style.filter = `brightness(${(0.7 + 0.7*g).toFixed(3)})`;
+        c.el.style.fontVariationSettings = '';
+        break;
+      }
+      case 'weight': {
+        const v = 0.5 + 0.5*Math.sin((t*speed*1.2 - phase) * Math.PI);
+        if(state.family === 'recursive'){
+          const minW = 300, maxW = 1000;
+          const w = minW + (maxW - minW) * (1 - amp + amp*v);
+          c.el.style.fontVariationSettings = `"wght" ${w.toFixed(1)}, "slnt" 0`;
+          c.el.style.opacity = '1'; c.el.style.transform = ''; c.el.style.filter = '';
+        } else {
+          c.el.style.opacity = (0.4 + 0.6*v).toFixed(3);
+          c.el.style.filter = `blur(${((1-v)*amp*0.6).toFixed(2)}px)`;
+          c.el.style.transform = '';
+          c.el.style.fontVariationSettings = '';
+        }
+        break;
+      }
+    }
+  }
+  // decay beat boost
+  beatBoost *= 0.92;
+}
+
+function tick(now){
+  if(state.paused){ requestAnimationFrame(tick); return; }
+  const t = ((now - startTime) - pauseOffset) / 1000;
+  const activeChars = activeLayer === 'A' ? charsA : charsB;
+  applyAnim(activeChars, t);
+  if(audio.running) audio.update(t);
+  requestAnimationFrame(tick);
+}
+
+/* —————————————————————————————————————————————————————————————————————
+   Apply preset (with crossfade)
+   ————————————————————————————————————————————————————————————————————— */
+function applyPreset(presetState, opts = {}){
+  const fade = opts.fade !== false;
+  // swap to the inactive layer with new state
+  const target = state;
+  Object.assign(target, presetState);
+  if(fade){
+    // build new state on the *other* layer, then crossfade
+    const otherLayer = activeLayer === 'A' ? 'B' : 'A';
+    const otherStage = otherLayer === 'A' ? stageA : stageB;
+    const otherLayerEl = otherLayer === 'A' ? layerA : layerB;
+    const curLayerEl = activeLayer === 'A' ? layerA : layerB;
+    // rebuild chars on the other stage
+    const newChars = buildText(otherStage, target.text || ' ');
+    // apply static styles to BOTH stages (will inherit current `state`)
+    applyStaticStyles();
+    // crossfade: set transition duration based on crossfadeDuration
+    layerA.style.transition = `opacity ${crossfadeDuration}s ease`;
+    layerB.style.transition = `opacity ${crossfadeDuration}s ease`;
+    otherLayerEl.classList.add('active');
+    curLayerEl.classList.remove('active');
+    // swap pointers
+    if(otherLayer === 'A'){ charsA = newChars; } else { charsB = newChars; }
+    activeLayer = otherLayer;
+  } else {
+    rebuildAll();
+  }
+  syncControlsFromState();
+  updateActiveTile();
+}
+
+/* —————————————————————————————————————————————————————————————————————
+   Sync UI controls back from state
+   ————————————————————————————————————————————————————————————————————— */
+function syncControlsFromState(){
+  // sliders
+  ['size','weight','track','speed','amp','spread','softness'].forEach(k => {
+    const input = document.getElementById(k);
+    if(!input) return;
+    input.value = state[k];
+    setSliderProgress(input);
+    const valEl = document.getElementById(k + 'Val');
+    if(valEl){
+      const fmt = ({
+        size:v=>Math.round(v),
+        weight:v=>Math.round(v),
+        track:v=>(+v).toFixed(3),
+        speed:v=>(+v).toFixed(2)+'×',
+        amp:v=>(+v).toFixed(2),
+        spread:v=>(+v).toFixed(2),
+        softness:v=>(+v).toFixed(2),
+      })[k];
+      valEl.textContent = fmt(state[k]);
+    }
+  });
+  // textarea
+  if(textInput.value !== state.text) textInput.value = state.text;
+  // family
+  $$('#familySeg button').forEach(b => b.classList.toggle('active', b.dataset.family === state.family));
+  // lang
+  $$('#langGrid button').forEach(b => b.classList.toggle('active', b.dataset.lang === state.lang));
+  // anim
+  $$('#animGrid .anim-card').forEach(b => b.classList.toggle('active', b.dataset.anim === state.anim));
+  // color
+  $$('.swatch').forEach(s => s.classList.toggle('active', s.dataset.color === state.color));
+}
+
+/* —————————————————————————————————————————————————————————————————————
+   Presets UI
+   ————————————————————————————————————————————————————————————————————— */
+function renderPresets(){
+  presetGrid.innerHTML = '';
+  const all = [...BUILTIN_PRESETS, ...userPresets.map(p => ({...p, _user:true}))];
+  presetBadge.textContent = all.length;
+  all.forEach((p, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'preset' + (p._user ? ' user' : '');
+    btn.dataset.idx = idx;
+    btn.style.setProperty('--swatch', p.state.color || '#c87cff');
+    btn.innerHTML = `
+      <span class="pswatch"></span>
+      <span class="pname">${escapeHtml(p.name)}</span>
+      <span class="ptag">${p.state.anim} · ${p.state.family}</span>
+    `;
+    btn.addEventListener('click', () => {
+      applyPreset(p.state);
+      showToast(`→ ${p.name}`);
+    });
+    if(p._user){
+      // long-press to delete
+      let pressT;
+      btn.addEventListener('pointerdown', () => {
+        pressT = setTimeout(() => {
+          if(confirm(`Delete preset "${p.name}"?`)){
+            const realIdx = userPresets.findIndex(x => x.name === p.name && x.savedAt === p.savedAt);
+            if(realIdx >= 0){
+              userPresets.splice(realIdx, 1);
+              localStorage.setItem(USER_KEY, JSON.stringify(userPresets));
+              renderPresets();
+              renderVJTiles();
+              showToast('Deleted.');
+            }
+          }
+        }, 600);
+      });
+      btn.addEventListener('pointerup', () => clearTimeout(pressT));
+      btn.addEventListener('pointerleave', () => clearTimeout(pressT));
+    }
+    presetGrid.appendChild(btn);
+  });
+  $("#userHint").style.display = userPresets.length ? 'block' : 'none';
+}
+
+/* —————————————————————————————————————————————————————————————————————
+   Sliders / controls binding
+   ————————————————————————————————————————————————————————————————————— */
+function setSliderProgress(input){
+  const min = +input.min, max = +input.max, val = +input.value;
+  const p = ((val - min) / (max - min)) * 100;
+  input.style.setProperty('--p', p + '%');
+}
+function bindSlider(id, key, formatter){
+  const input = document.getElementById(id);
+  const valEl = document.getElementById(id + 'Val');
+  input.value = state[key];
+  setSliderProgress(input);
+  if(valEl) valEl.textContent = formatter(state[key]);
+  input.addEventListener('input', () => {
+    const v = +input.value;
+    state[key] = v;
+    setSliderProgress(input);
+    if(valEl) valEl.textContent = formatter(v);
+    if(key === 'size' || key === 'weight' || key === 'track') applyStaticStyles();
+    persist({[key]: v});
+  });
+}
+bindSlider('size','size', v => Math.round(v));
+bindSlider('weight','weight', v => Math.round(v));
+bindSlider('track','track', v => (+v).toFixed(3));
+bindSlider('speed','speed', v => (+v).toFixed(2) + '×');
+bindSlider('amp','amp', v => (+v).toFixed(2));
+bindSlider('spread','spread', v => (+v).toFixed(2));
+bindSlider('softness','softness', v => (+v).toFixed(2));
+
+$$('#familySeg button').forEach(b => {
+  b.addEventListener('click', () => {
+    $$('#familySeg button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    state.family = b.dataset.family;
+    applyStaticStyles();
+    persist({family:state.family});
+  });
+});
+$$('#langGrid button').forEach(b => {
+  b.addEventListener('click', () => {
+    $$('#langGrid button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    state.lang = b.dataset.lang;
+    applyStaticStyles();
+    persist({lang:state.lang});
+  });
+});
+$$('#animGrid .anim-card').forEach(b => {
+  b.addEventListener('click', () => {
+    $$('#animGrid .anim-card').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    state.anim = b.dataset.anim;
+    // clear leftover styles
+    const arr = activeLayer === 'A' ? charsA : charsB;
+    arr.forEach(c => { c.el.style.transform=''; c.el.style.opacity=''; c.el.style.filter=''; c.el.style.fontVariationSettings=''; });
+    startTime = performance.now(); pauseOffset = 0;
+    persist({anim:state.anim});
+    updateActiveTile();
+  });
+});
+$$('.swatch').forEach(s => {
+  s.addEventListener('click', () => {
+    $$('.swatch').forEach(x => x.classList.remove('active'));
+    s.classList.add('active');
+    state.color = s.dataset.color;
+    applyStaticStyles();
+    persist({color:state.color});
+  });
+});
+
+let textDeb;
+textInput.value = state.text;
+textInput.addEventListener('input', () => {
+  state.text = textInput.value;
+  clearTimeout(textDeb);
+  textDeb = setTimeout(() => {
+    rebuildAll();
+    persist({text: state.text});
+  }, 80);
+});
+
+closeBtn.addEventListener('click', () => {
+  panel.classList.add('closed');
+  reopen.classList.add('show');
+  document.getElementById('stage').classList.add('no-panel');
+});
+reopen.addEventListener('click', () => {
+  panel.classList.remove('closed');
+  reopen.classList.remove('show');
+  document.getElementById('stage').classList.remove('no-panel');
+});
+
+/* —————————————————————————————————————————————————————————————————————
+   Quick actions (top of panel)
+   ————————————————————————————————————————————————————————————————————— */
+$("#qaRandom").addEventListener('click', () => randomize());
+$("#qaReset").addEventListener('click', () => {
+  applyPreset({...TWEAKS});
+  showToast('Reset.');
+});
+$("#qaExport").addEventListener('click', () => exportImage());
+$("#qaSave").addEventListener('click', () => saveCurrentAsPreset());
+
+function randomize(){
+  const anims = ['breathe','wave','twist','typewriter','flow','weight'];
+  const fams = ['sans','serif','recursive'];
+  const colors = ['#f3eee6','#ffffff','#c87cff','#7fdcff','#9bd3a7','#ffb27a','#ff7a9c','#7a6bff'];
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+  const next = {
+    anim: pick(anims),
+    family: pick(fams),
+    color: pick(colors),
+    speed: +(0.4 + Math.random()*2).toFixed(2),
+    amp: +(0.4 + Math.random()*0.6).toFixed(2),
+    spread: +(Math.random()*0.5).toFixed(2),
+    softness: +(0.2 + Math.random()*0.6).toFixed(2),
+    weight: pick([300,400,500,700,900]),
+    track: +(Math.random()*0.15).toFixed(3),
+    size: Math.round(80 + Math.random()*140),
+  };
+  applyPreset(next);
+  showToast('Randomized.');
+}
+
+function saveCurrentAsPreset(){
+  const name = prompt('Name this preset:', `Preset ${userPresets.length + 1}`);
+  if(!name) return;
+  const snapshot = {
+    name, savedAt: Date.now(),
+    state: {
+      text: state.text, family: state.family, lang: state.lang,
+      size: state.size, weight: state.weight, track: state.track,
+      anim: state.anim, speed: state.speed, amp: state.amp,
+      spread: state.spread, softness: state.softness, color: state.color,
+    }
+  };
+  userPresets.unshift(snapshot);
+  // cap at 32 user presets
+  if(userPresets.length > 32) userPresets.length = 32;
+  localStorage.setItem(USER_KEY, JSON.stringify(userPresets));
+  renderPresets();
+  renderVJTiles();
+  showToast(`Saved "${name}"`);
+}
+
+/* —————————————————————————————————————————————————————————————————————
+   Image export
+   ————————————————————————————————————————————————————————————————————— */
+function exportImage(){
+  // render current view to canvas via offscreen draw of each char
+  const stageEl = activeLayer === 'A' ? stageA : stageB;
+  const rect = document.getElementById('stage').getBoundingClientRect();
+  const W = Math.round(rect.width * 2);
+  const H = Math.round(rect.height * 2);
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  // bg
+  ctx.fillStyle = '#07070c';
+  ctx.fillRect(0,0,W,H);
+  // ambient gradients
+  const g1 = ctx.createRadialGradient(W*0.3, H*0.4, 0, W*0.3, H*0.4, Math.max(W,H)*0.6);
+  g1.addColorStop(0, 'rgba(200,124,255,0.10)'); g1.addColorStop(1, 'rgba(200,124,255,0)');
+  ctx.fillStyle = g1; ctx.fillRect(0,0,W,H);
+  const g2 = ctx.createRadialGradient(W*0.75, H*0.7, 0, W*0.75, H*0.7, Math.max(W,H)*0.5);
+  g2.addColorStop(0, 'rgba(127,220,255,0.06)'); g2.addColorStop(1, 'rgba(127,220,255,0)');
+  ctx.fillStyle = g2; ctx.fillRect(0,0,W,H);
+  // draw each char in its current position with its current opacity
+  const stageRect = stageEl.getBoundingClientRect();
+  const chs = stageEl.querySelectorAll('.ch');
+  const fontStack = stageEl.style.fontFamily;
+  chs.forEach(ch => {
+    if(ch.classList.contains('space')) return;
+    const cr = ch.getBoundingClientRect();
+    const cs = getComputedStyle(ch);
+    const op = parseFloat(cs.opacity || '1');
+    const color = cs.color || state.color;
+    let weight = state.weight;
+    const fvs = ch.style.fontVariationSettings || '';
+    const wMatch = fvs.match(/"wght"\s+(\d+\.?\d*)/);
+    if(wMatch) weight = +wMatch[1];
+    ctx.save();
+    ctx.globalAlpha = op;
+    ctx.fillStyle = color;
+    ctx.font = `${weight} ${state.size*2}px ${fontStack}`;
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'center';
+    // position: char center in canvas coords (2x scaling)
+    const cx = (cr.left + cr.width/2 - rect.left) * 2;
+    const cy = (cr.bottom - rect.top) * 2 - (cr.height*2*0.18);
+    // bake in transform: parse current matrix
+    const mtx = new DOMMatrixReadOnly(cs.transform === 'none' ? 'matrix(1,0,0,1,0,0)' : cs.transform);
+    ctx.translate(cx, cy);
+    ctx.transform(mtx.a, mtx.b, mtx.c, mtx.d, mtx.e, mtx.f);
+    ctx.fillText(ch.textContent, 0, 0);
+    ctx.restore();
+  });
+  // download
+  canvas.toBlob(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `type-field-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    showToast('Image saved.');
+  }, 'image/png');
+}
+
+/* —————————————————————————————————————————————————————————————————————
+   VJ Dashboard
+   ————————————————————————————————————————————————————————————————————— */
+const vj = $("#vj");
+const vjGrid = $("#vjGrid");
+const vjNowName = $("#vjNowName");
+const vjFadeInput = $("#vjFade");
+const vjFadeVal = $("#vjFadeVal");
+
+vjFadeInput.addEventListener('input', () => {
+  crossfadeDuration = +vjFadeInput.value;
+  vjFadeVal.textContent = crossfadeDuration.toFixed(1) + 's';
+});
+
+function vjOpen(){ vj.classList.add('show'); vj.setAttribute('aria-hidden','false'); }
+function vjClose(){ vj.classList.remove('show'); vj.setAttribute('aria-hidden','true'); }
+vjBtn.addEventListener('click', vjOpen);
+$("#vjClose").addEventListener('click', vjClose);
+
+function renderVJTiles(){
+  vjGrid.innerHTML = '';
+  const all = [...BUILTIN_PRESETS, ...userPresets.map(p => ({...p, _user:true}))];
+  all.forEach((p, idx) => {
+    const tile = document.createElement('button');
+    tile.className = 'vj-tile';
+    tile.dataset.idx = idx;
+    tile.dataset.name = p.name;
+    const fam = FONT[p.state.family] && FONT[p.state.family][p.state.lang] || FONT.sans.latin;
+    const preview = (p.state.text || '').slice(0, 3) || 'Aa';
+    tile.innerHTML = `
+      <div class="tile-preview" style="font-family:${fam};color:${p.state.color};opacity:.85;font-weight:${p.state.weight}">${escapeHtml(preview)}</div>
+      <div class="tile-name">${escapeHtml(p.name)}${p.zh ? ` <em style="color:rgba(255,255,255,.55);font-style:italic;font-size:11px;margin-left:4px">${escapeHtml(p.zh)}</em>` : ''}</div>
+      <div class="tile-meta"><span>${p.state.anim}</span><span>${p.state.family}</span></div>
+      ${idx < 9 ? `<div class="tile-key">${idx+1}</div>` : ''}
+    `;
+    tile.addEventListener('click', () => {
+      applyPreset(p.state);
+      vjNowName.textContent = p.name;
+      showToast(`→ ${p.name}`);
+      // optionally close VJ
+    });
+    vjGrid.appendChild(tile);
+  });
+  updateActiveTile();
+}
+function updateActiveTile(){
+  // mark tile whose state matches current best (by name from "vjNowName" if available, else by anim+color)
+  $$('.vj-tile').forEach(t => t.classList.remove('active'));
+  const cur = vjNowName.textContent;
+  const found = $$('.vj-tile').find(t => t.dataset.name === cur);
+  if(found) found.classList.add('active');
+}
+
+/* —————————————————————————————————————————————————————————————————————
+   Audio Analyzer + Vibe detection
+   ————————————————————————————————————————————————————————————————————— */
+const audio = (() => {
+  let ctx, analyser, source, raf;
+  let running = false;
+  let audioEl;
+  let micStream;
+  const fftSize = 1024;
+  const freqData = new Uint8Array(fftSize/2);
+  const energyBuf = []; // rolling energy
+  let lastPeakT = 0;
+  let peakTimes = [];
+  let bpm = 0;
+  let energySmoothed = 0;
+  let bassSmoothed = 0, midSmoothed = 0, trebleSmoothed = 0;
+  let lastVibe = '', lastVibeAt = 0, vibeConfidence = 0;
+
+  const spectrum = $("#spectrum");
+  const sctx = spectrum.getContext('2d');
+
+  const vibeNameEl = $("#vibeName");
+  const vibeConfEl = $("#vibeConf");
+  const bpmEl = $("#bpmVal");
+  const energyEl = $("#energyVal");
+  const bassEl = $("#bassVal");
+  const trebleEl = $("#trebleVal");
+  const audioBadge = $("#audioBadge");
+
+  const statusDot = $("#statusDot");
+
+  async function ensureCtx(){
+    if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if(ctx.state === 'suspended') await ctx.resume();
+    if(!analyser){
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = fftSize;
+      analyser.smoothingTimeConstant = 0.78;
+    }
+  }
+
+  async function loadFile(file){
+    stop();
+    await ensureCtx();
+    audioEl = new Audio();
+    audioEl.src = URL.createObjectURL(file);
+    audioEl.crossOrigin = 'anonymous';
+    audioEl.loop = true;
+    source = ctx.createMediaElementSource(audioEl);
+    source.connect(analyser);
+    analyser.connect(ctx.destination);
+    audioEl.play();
+    running = true;
+    audioBadge.textContent = 'live · file';
+    vibeConfEl.textContent = 'listening…';
+  }
+  async function startMic(){
+    stop();
+    await ensureCtx();
+    try{
+      micStream = await navigator.mediaDevices.getUserMedia({audio:true});
+    }catch(e){
+      showToast('Mic permission denied');
+      return;
+    }
+    source = ctx.createMediaStreamSource(micStream);
+    source.connect(analyser);
+    // do NOT connect to destination (avoid feedback)
+    running = true;
+    audioBadge.textContent = 'live · mic';
+    vibeConfEl.textContent = 'listening…';
+  }
+  function stop(){
+    running = false;
+    if(audioEl){ try { audioEl.pause(); } catch(_){} audioEl = null; }
+    if(micStream){ micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    if(source){ try{source.disconnect()}catch(_){} source = null; }
+    audioBadge.textContent = 'off';
+    vibeNameEl.textContent = '— No input —';
+    vibeConfEl.textContent = 'idle';
+    bpmEl.textContent = '—'; energyEl.textContent = '—'; bassEl.textContent = '—'; trebleEl.textContent = '—';
+    sctx.clearRect(0,0,spectrum.width,spectrum.height);
+    statusDot.classList.remove('beat');
+    bpm = 0; peakTimes.length = 0; energyBuf.length = 0;
+  }
+
+  function update(t){
+    if(!running || !analyser) return;
+    analyser.getByteFrequencyData(freqData);
+    // bands
+    const sr = (ctx && ctx.sampleRate) || 44100;
+    const nyq = sr/2;
+    const bins = freqData.length;
+    const binHz = nyq/bins;
+    // bass 30-200, low-mid 200-500, mid 500-2k, high 2k-8k
+    let bassE=0,bassN=0,midE=0,midN=0,trE=0,trN=0,totalE=0;
+    for(let i=0;i<bins;i++){
+      const f = i*binHz;
+      const v = freqData[i] / 255;
+      const e = v*v;
+      totalE += e;
+      if(f>=30 && f<=200){ bassE+=e; bassN++; }
+      else if(f>200 && f<=2000){ midE+=e; midN++; }
+      else if(f>2000 && f<=8000){ trE+=e; trN++; }
+    }
+    const bass = bassN ? bassE/bassN : 0;
+    const mid  = midN ? midE/midN : 0;
+    const treble = trN ? trE/trN : 0;
+    const energy = totalE/bins;
+    // smooth
+    energySmoothed = energySmoothed*0.85 + energy*0.15;
+    bassSmoothed   = bassSmoothed*0.8 + bass*0.2;
+    midSmoothed    = midSmoothed*0.8 + mid*0.2;
+    trebleSmoothed = trebleSmoothed*0.8 + treble*0.2;
+
+    // beat detection — bass-band onset
+    energyBuf.push({t, e:bassSmoothed});
+    while(energyBuf.length && t - energyBuf[0].t > 2.0) energyBuf.shift();
+    const recentAvg = energyBuf.reduce((s,x)=>s+x.e, 0) / (energyBuf.length || 1);
+    if(bassSmoothed > recentAvg*1.55 && bassSmoothed > 0.02 && t - lastPeakT > 0.22){
+      lastPeakT = t;
+      peakTimes.push(t);
+      if(peakTimes.length > 12) peakTimes.shift();
+      // BPM = median of intervals
+      if(peakTimes.length >= 4){
+        const ints = [];
+        for(let i=1;i<peakTimes.length;i++) ints.push(peakTimes[i]-peakTimes[i-1]);
+        ints.sort((a,b)=>a-b);
+        const med = ints[Math.floor(ints.length/2)];
+        let cand = 60/med;
+        while(cand < 70) cand *= 2;
+        while(cand > 180) cand /= 2;
+        bpm = Math.round(bpm*0.6 + cand*0.4);
+      }
+      // beat-sync visual pulse
+      if(state.beatSync){
+        beatBoost = 1.0;
+        statusDot.classList.add('beat');
+        setTimeout(()=>statusDot.classList.remove('beat'), 80);
+      }
+    }
+
+    // draw spectrum
+    sctx.clearRect(0,0,spectrum.width,spectrum.height);
+    const W = spectrum.width, H = spectrum.height;
+    const nBars = 48;
+    const step = Math.floor(bins/nBars);
+    for(let i=0;i<nBars;i++){
+      let m = 0;
+      for(let j=0;j<step;j++) m = Math.max(m, freqData[i*step + j]/255);
+      const h = m * H;
+      const x = (W/nBars)*i;
+      const w = (W/nBars) - 2;
+      const hue = i/nBars;
+      const c1 = `rgba(199,124,255,${0.25 + m*0.55})`;
+      const c2 = `rgba(127,220,255,${0.25 + m*0.55})`;
+      const grad = sctx.createLinearGradient(0,H,0,0);
+      grad.addColorStop(0, c1); grad.addColorStop(1, c2);
+      sctx.fillStyle = grad;
+      sctx.fillRect(x, H-h, w, h);
+    }
+
+    // vibe classification (gentle hysteresis)
+    const vibe = classifyVibe({bpm, energy:energySmoothed, bass:bassSmoothed, mid:midSmoothed, treble:trebleSmoothed});
+    bpmEl.textContent = bpm || '—';
+    energyEl.textContent = (energySmoothed*100).toFixed(0);
+    bassEl.textContent = (bassSmoothed*100).toFixed(0);
+    trebleEl.textContent = (trebleSmoothed*100).toFixed(0);
+
+    if(vibe){
+      vibeNameEl.textContent = vibeLabel(vibe.name);
+      vibeConfEl.textContent = vibe.conf + '% conf';
+      if(state.autoVibe && vibe.name !== lastVibe && t - lastVibeAt > 3.5 && vibe.conf > 55){
+        lastVibe = vibe.name; lastVibeAt = t;
+        const presetName = VIBE_PRESETS[vibe.name];
+        if(presetName){
+          const p = BUILTIN_PRESETS.find(x => x.name === presetName);
+          if(p){
+            applyPreset({...p.state, text: state.text}); // keep current text
+            vjNowName.textContent = p.name;
+            showToast(`✦ Auto: ${vibeLabel(vibe.name)} → ${p.name}`);
+          }
+        }
+      }
+    }
+  }
+
+  function vibeLabel(name){
+    return ({Ambient:'Ambient',Dance:'Dance / Electronic',HipHop:'Hip-Hop',Pop:'Pop',LoFi:'Lo-Fi',Cinematic:'Cinematic',Rock:'Rock'})[name] || name;
+  }
+  function classifyVibe({bpm, energy, bass, mid, treble}){
+    if(energy < 0.005) return null;
+    const high = treble, lo = bass, m = mid;
+    let name = 'Ambient', score = 0;
+    if(bpm > 0){
+      if(bpm >= 120 && lo > 0.04 && energy > 0.03){ name = 'Dance'; score = 75 + Math.min(20, (bpm-120)/3); }
+      else if(bpm >= 80 && bpm <= 110 && lo > 0.05){ name = 'HipHop'; score = 70 + (lo*200); }
+      else if(bpm >= 90 && bpm <= 130 && m > 0.04 && high > 0.02){ name = 'Pop'; score = 65 + (m*150); }
+      else if(bpm >= 100 && lo > 0.03 && high > 0.04){ name = 'Rock'; score = 60 + (high*200); }
+      else if(bpm < 90 && energy < 0.03){ name = 'Cinematic'; score = 55 + (1-energy*30)*20; }
+      else if(bpm < 100 && lo > 0.03 && high < 0.03){ name = 'LoFi'; score = 60 + (lo*100); }
+      else { name = 'Ambient'; score = 50; }
+    } else {
+      if(energy < 0.01) name = 'Ambient', score = 50;
+      else if(lo > 0.05) name = 'HipHop', score = 55;
+      else name = 'Cinematic', score = 50;
+    }
+    return { name, conf: Math.min(99, Math.round(score)) };
+  }
+
+  return { loadFile, startMic, stop, update, get running(){ return running; } };
+})();
+
+$("#audioFile").addEventListener('change', e => {
+  const f = e.target.files[0];
+  if(f) audio.loadFile(f);
+});
+$("#audioStop").addEventListener('click', () => audio.stop());
+$("#micBtn").addEventListener('click', () => audio.startMic());
+$("#autoVibeBtn").addEventListener('click', () => {
+  state.autoVibe = !state.autoVibe;
+  $("#autoVibeBtn").classList.toggle('on', state.autoVibe);
+  persist({autoVibe: state.autoVibe});
+});
+$("#beatSyncBtn").addEventListener('click', () => {
+  state.beatSync = !state.beatSync;
+  $("#beatSyncBtn").classList.toggle('on', state.beatSync);
+  persist({beatSync: state.beatSync});
+});
+$("#autoVibeBtn").classList.toggle('on', state.autoVibe);
+$("#beatSyncBtn").classList.toggle('on', state.beatSync);
+
+/* —————————————————————————————————————————————————————————————————————
+   Persist
+   ————————————————————————————————————————————————————————————————————— */
+function persist(edits){
+  try{ window.parent.postMessage({type:'__edit_mode_set_keys', edits}, '*'); }catch(_){}
+}
+
+/* —————————————————————————————————————————————————————————————————————
+   Toast
+   ————————————————————————————————————————————————————————————————————— */
+let toastT;
+function showToast(msg){
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>toast.classList.remove('show'), 1600);
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* —————————————————————————————————————————————————————————————————————
+   Keyboard
+   ————————————————————————————————————————————————————————————————————— */
+window.addEventListener('keydown', e => {
+  if(e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+  if(e.code === 'Space'){ e.preventDefault();
+    if(state.paused){ state.paused = false; pauseOffset += performance.now() - pausedAt; }
+    else { state.paused = true; pausedAt = performance.now(); }
+    showToast(state.paused ? '⏸ Paused' : '▶ Play');
+  }
+  if(e.key === 'r' || e.key === 'R'){ randomize(); }
+  if(e.key === 'Escape'){ if(vj.classList.contains('show')) vjClose(); }
+  if(e.key === 'v' || e.key === 'V'){ vj.classList.contains('show') ? vjClose() : vjOpen(); }
+  // 1-9 switch preset
+  if(/^[1-9]$/.test(e.key)){
+    const idx = parseInt(e.key,10) - 1;
+    const all = [...BUILTIN_PRESETS, ...userPresets];
+    if(all[idx]){
+      applyPreset(all[idx].state);
+      vjNowName.textContent = all[idx].name;
+      showToast(`→ ${all[idx].name}`);
+    }
+  }
+});
+
+/* —————————————————————————————————————————————————————————————————————
+   Boot
+   ————————————————————————————————————————————————————————————————————— */
+renderPresets();
+renderVJTiles();
+rebuildAll();
+syncControlsFromState();
+crossfadeDuration = +vjFadeInput.value;
+vjFadeVal.textContent = crossfadeDuration.toFixed(1) + 's';
+requestAnimationFrame(tick);
+
+})();
+</script>
+</body>
+</html>

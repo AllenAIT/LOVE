@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Type Field — animated typography</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<!-- Latin -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;700;900&family=Noto+Serif:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+<!-- Simplified Chinese -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Noto+Serif+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+<!-- Traditional Chinese -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Noto+Serif+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+<!-- Japanese -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Noto+Serif+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+<!-- Korean -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Noto+Serif+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+<!-- Variable font for animation: Recursive has weight + slant axes -->
+<link href="https://fonts.googleapis.com/css2?family=Recursive:slnt,wght@-15..0,300..1000&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg-0:#07070c;
+    --bg-1:#0c0b14;
+    --ink:#f3eee6;
+    --ink-soft:rgba(243,238,230,.62);
+    --ink-faint:rgba(243,238,230,.32);
+    --ink-ghost:rgba(243,238,230,.14);
+    --glass:rgba(18,16,28,.55);
+    --glass-stroke:rgba(255,255,255,.08);
+    --hairline:rgba(255,255,255,.06);
+    --accent:#c87cff;
+    --accent-2:#7fdcff;
+    --serif:"Instrument Serif", "Iowan Old Style", Georgia, serif;
+    --sans:"Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono:"JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg-0);color:var(--ink);font-family:var(--sans);overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+
+  /* — Stage / canvas — */
+  #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:0 440px 0 80px;}
+  /* subtle warm vignette */
+  #stage::before{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(60% 50% at 30% 40%, rgba(200,124,255,.08), transparent 70%),
+      radial-gradient(50% 40% at 75% 70%, rgba(127,220,255,.05), transparent 70%);
+  }
+  #stage::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(0,0,0,.45) 100%);
+  }
+  .type-stage{
+    position:relative;z-index:1;
+    width:100%;max-width:1100px;
+    text-align:center;
+    line-height:1.1;
+    word-break:break-word;
+    overflow-wrap:anywhere;
+    color:var(--ink);
+    will-change:transform;
+  }
+  .type-stage .word{display:inline-block;white-space:nowrap;margin-right:.25em;vertical-align:baseline}
+  .type-stage .word:last-child{margin-right:0}
+  .type-stage .ch{display:inline-block;will-change:transform,opacity,filter;transform-origin:50% 65%;backface-visibility:hidden}
+  .type-stage .ch.space{width:.28em}
+
+  /* — Top chrome — */
+  .topbar{
+    position:fixed;top:0;left:0;right:0;z-index:5;
+    padding:18px 22px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+    pointer-events:none;
+  }
+  .brand{pointer-events:auto}
+  .brand .title{font-family:var(--serif);font-weight:400;font-size:24px;line-height:1.1;letter-spacing:.005em;white-space:nowrap}
+  .brand .title em{font-style:italic;color:var(--ink-soft)}
+  .brand .subtitle{margin-top:6px;font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:.18em;text-transform:uppercase}
+  .meta{pointer-events:auto;display:flex;gap:14px;align-items:center;font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:.16em;text-transform:uppercase}
+  .meta .dot{width:6px;height:6px;border-radius:50%;background:#9bd3a7;box-shadow:0 0 8px #9bd3a7;animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.55}50%{opacity:1}}
+
+  /* — Panel — */
+  .panel{
+    position:fixed;z-index:4;
+    right:18px;top:64px;bottom:18px;width:400px;
+    background:var(--glass);
+    backdrop-filter:blur(22px) saturate(1.1);
+    -webkit-backdrop-filter:blur(22px) saturate(1.1);
+    border:1px solid var(--glass-stroke);
+    border-radius:22px;
+    display:flex;flex-direction:column;
+    box-shadow:0 30px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.04);
+    overflow:hidden;
+    transition:transform .45s cubic-bezier(.2,.8,.2,1), opacity .3s;
+  }
+  .panel.closed{transform:translateX(calc(100% + 28px));opacity:0;pointer-events:none}
+  .panel-head{
+    padding:14px 18px 14px;display:flex;flex-direction:column;gap:10px;
+    border-bottom:1px solid var(--hairline);
+  }
+  .panel-head .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .panel-head h2{margin:0;font-family:var(--serif);font-weight:400;font-size:17px;flex:1;min-width:0}
+  .panel-head h2 em{color:var(--ink-soft)}
+
+  .panel-toggle{
+    display:inline-flex;align-items:center;gap:6px;border:1px solid var(--glass-stroke);background:transparent;color:var(--ink-soft);
+    border-radius:999px;padding:6px 12px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+    transition:background .2s,color .2s,border-color .2s;
+  }
+  .panel-toggle:hover{background:rgba(255,255,255,.05);color:var(--ink);border-color:rgba(255,255,255,.16)}
+
+  .reopen{
+    position:fixed;z-index:4;right:18px;top:64px;
+    border:1px solid var(--glass-stroke);background:var(--glass);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+    color:var(--ink-soft);border-radius:999px;padding:8px 14px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+    opacity:0;pointer-events:none;transition:opacity .3s;
+  }
+  .reopen.show{opacity:1;pointer-events:auto}
+  .reopen:hover{color:var(--ink);border-color:rgba(255,255,255,.18)}
+
+  .panel-body{flex:1;overflow-y:auto;padding:6px 6px 16px 6px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.12) transparent;min-height:0}
+  .panel-body::-webkit-scrollbar{width:6px}
+  .panel-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
+
+  .section{padding:14px 14px 6px;border-bottom:1px solid var(--hairline)}
+  .section:last-child{border-bottom:none}
+  .section-title{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--ink-faint);margin:0 0 10px;display:flex;align-items:center;gap:8px;
+  }
+  .section-title::before{content:"";width:14px;height:1px;background:var(--ink-ghost)}
+
+  /* Text input */
+  .text-input{
+    width:100%;background:rgba(255,255,255,.04);border:1px solid var(--hairline);color:var(--ink);
+    border-radius:11px;padding:11px 12px;font-family:var(--sans);font-size:14px;line-height:1.45;
+    outline:none;transition:border-color .2s,background .2s;resize:vertical;min-height:62px;max-height:160px;
+  }
+  .text-input::placeholder{color:rgba(243,238,230,.28);font-style:italic;font-family:var(--serif)}
+  .text-input:focus{border-color:rgba(199,124,255,.4);background:rgba(255,255,255,.06)}
+
+  /* Font select - custom dropdown */
+  .font-group{display:flex;flex-direction:column;gap:8px}
+  .seg{
+    display:flex;background:rgba(255,255,255,.03);border:1px solid var(--hairline);border-radius:10px;padding:3px;gap:2px;
+  }
+  .seg button{
+    flex:1;appearance:none;border:none;background:transparent;color:var(--ink-faint);
+    padding:7px 6px;border-radius:7px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+    transition:background .2s,color .2s;min-width:0;
+  }
+  .seg button:hover{color:var(--ink-soft)}
+  .seg button.active{background:rgba(255,255,255,.08);color:var(--ink)}
+
+  .lang-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+  .lang-grid button{
+    appearance:none;border:1px solid var(--hairline);background:rgba(255,255,255,.02);color:var(--ink-faint);
+    padding:9px 4px;border-radius:8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+    transition:background .2s,color .2s,border-color .2s;
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+  }
+  .lang-grid button .glyph{font-family:var(--sans);font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink-soft)}
+  .lang-grid button:hover{color:var(--ink-soft);border-color:rgba(255,255,255,.14)}
+  .lang-grid button.active{background:rgba(199,124,255,.12);color:var(--ink);border-color:rgba(199,124,255,.4)}
+  .lang-grid button.active .glyph{color:var(--ink)}
+
+  /* Anim chooser */
+  .anim-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+  .anim-card{
+    appearance:none;border:1px solid var(--hairline);background:rgba(255,255,255,.02);color:var(--ink-soft);
+    padding:10px 10px;border-radius:11px;cursor:pointer;text-align:left;
+    transition:background .2s,color .2s,border-color .2s,transform .15s;
+    display:flex;flex-direction:column;gap:6px;min-height:64px;position:relative;overflow:hidden;
+  }
+  .anim-card:hover{color:var(--ink);border-color:rgba(255,255,255,.16)}
+  .anim-card.active{background:rgba(199,124,255,.10);border-color:rgba(199,124,255,.45);color:var(--ink)}
+  .anim-card .name{font-family:var(--sans);font-size:12.5px;letter-spacing:.005em;display:flex;align-items:center;gap:6px}
+  .anim-card .zh{font-family:var(--serif);font-style:italic;color:var(--ink-faint);font-size:11.5px}
+  .anim-card.active .zh{color:var(--ink-soft)}
+  .anim-card .preview{
+    font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.04em;
+    display:flex;gap:1px;align-items:flex-end;height:18px;margin-top:2px;
+  }
+  .anim-card .preview span{display:inline-block;transition:opacity .2s}
+
+  /* Sliders */
+  .slider-row{display:flex;flex-direction:column;gap:6px;padding:9px 0}
+  .slider-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .slider-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+  .slider-zh{font-family:var(--serif);font-style:italic;color:var(--ink-faint);font-size:11.5px;margin-left:6px}
+  .slider-value{font-family:var(--mono);font-size:10.5px;color:var(--ink);letter-spacing:.04em;tabular-nums:1}
+  input[type="range"]{
+    -webkit-appearance:none;appearance:none;width:100%;height:18px;background:transparent;cursor:pointer;
+  }
+  input[type="range"]::-webkit-slider-runnable-track{
+    height:2px;background:linear-gradient(to right, rgba(199,124,255,.55) 0%, rgba(199,124,255,.55) var(--p,50%), rgba(255,255,255,.08) var(--p,50%));border-radius:2px;
+  }
+  input[type="range"]::-moz-range-track{height:2px;background:rgba(255,255,255,.08);border-radius:2px}
+  input[type="range"]::-moz-range-progress{height:2px;background:rgba(199,124,255,.55);border-radius:2px}
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--ink);margin-top:-5px;
+    box-shadow:0 0 0 4px rgba(199,124,255,.18);cursor:grab;transition:box-shadow .15s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover{box-shadow:0 0 0 6px rgba(199,124,255,.24)}
+  input[type="range"]::-moz-range-thumb{width:12px;height:12px;border:none;border-radius:50%;background:var(--ink);cursor:grab}
+
+  /* Color swatches */
+  .swatches{display:flex;gap:6px;flex-wrap:wrap}
+  .swatch{
+    width:26px;height:26px;border-radius:50%;border:1px solid var(--hairline);cursor:pointer;
+    transition:transform .15s,border-color .15s;
+  }
+  .swatch:hover{transform:scale(1.08);border-color:rgba(255,255,255,.25)}
+  .swatch.active{border-color:var(--ink);box-shadow:0 0 0 2px rgba(255,255,255,.08)}
+
+  /* Buttons row */
+  .actions{display:flex;gap:6px;padding-top:6px}
+  .btn{
+    appearance:none;border:1px solid var(--hairline);background:rgba(255,255,255,.03);color:var(--ink-soft);
+    padding:8px 12px;border-radius:9px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+    transition:background .15s,color .15s,border-color .15s;flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .btn:hover{background:rgba(255,255,255,.06);color:var(--ink);border-color:rgba(255,255,255,.16)}
+  .btn.primary{background:linear-gradient(135deg,#7fdcff,#c87cff);color:#0e0c16;border-color:transparent;font-weight:500}
+  .btn.primary:hover{filter:brightness(1.08)}
+
+  /* Hint text */
+  .hint{font-family:var(--serif);font-style:italic;color:var(--ink-faint);font-size:11.5px;line-height:1.45;padding:2px 0 0}
+
+  /* — Responsive: stack panel on narrow viewports — */
+  @media (max-width: 900px){
+    #stage{padding:80px 24px 40vh 24px}
+    .panel{left:12px;right:12px;top:auto;bottom:12px;width:auto;height:38vh;border-radius:18px}
+    .panel.closed{transform:translateY(calc(100% + 24px));opacity:0}
+    .reopen{left:auto;right:18px;top:auto;bottom:18px}
+  }
+</style>
+</head>
+<body>
+
+<div id="stage" aria-hidden="false">
+  <div class="type-stage" id="typeStage"></div>
+</div>
+
+<!-- Top chrome -->
+<div class="topbar">
+  <div class="brand">
+    <div class="title">Type <em>Field</em></div>
+    <div class="subtitle">A typography animation playground</div>
+  </div>
+  <div class="meta">
+    <span class="dot"></span>
+    <span id="status">Live · Recursive</span>
+  </div>
+</div>
+
+<button class="reopen" id="reopen">Open Panel</button>
+
+<!-- Control panel -->
+<aside class="panel" id="panel">
+  <div class="panel-head">
+    <div class="row">
+      <h2>Field <em>controls</em></h2>
+      <button class="panel-toggle" id="closeBtn">Close</button>
+    </div>
+  </div>
+
+  <div class="panel-body">
+
+    <!-- Text -->
+    <section class="section">
+      <h3 class="section-title">Text · 文字</h3>
+      <textarea class="text-input" id="textInput" rows="2" placeholder="Type anything · 輸入任何文字…">輕輕呼吸  ·  breathe softly</textarea>
+      <div class="hint">Mix scripts freely — EN · 中文 · 日本語 · 한글.</div>
+    </section>
+
+    <!-- Font -->
+    <section class="section">
+      <h3 class="section-title">Font · 字體</h3>
+      <div class="font-group">
+        <div class="seg" id="familySeg" role="tablist">
+          <button data-family="sans" class="active">Sans</button>
+          <button data-family="serif">Serif</button>
+          <button data-family="recursive">Recursive <span style="opacity:.5">·var</span></button>
+        </div>
+        <div class="lang-grid" id="langGrid">
+          <button data-lang="latin" class="active"><span class="glyph">Aa</span><span>Latin</span></button>
+          <button data-lang="sc"><span class="glyph">简</span><span>S Chinese</span></button>
+          <button data-lang="tc"><span class="glyph">繁</span><span>T Chinese</span></button>
+          <button data-lang="jp"><span class="glyph">あ</span><span>Japanese</span></button>
+          <button data-lang="kr"><span class="glyph">한</span><span>Korean</span></button>
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-head"><span class="slider-label">Size <span class="slider-zh">字級</span></span><span class="slider-value" id="sizeVal">120</span></div>
+          <input id="size" type="range" min="32" max="240" value="120" />
+        </div>
+        <div class="slider-row">
+          <div class="slider-head"><span class="slider-label">Weight <span class="slider-zh">字重</span></span><span class="slider-value" id="weightVal">400</span></div>
+          <input id="weight" type="range" min="300" max="900" step="100" value="400" />
+        </div>
+        <div class="slider-row">
+          <div class="slider-head"><span class="slider-label">Tracking <span class="slider-zh">字距</span></span><span class="slider-value" id="trackVal">0.00</span></div>
+          <input id="track" type="range" min="-0.05" max="0.4" step="0.005" value="0" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Animation -->
+    <section class="section">
+      <h3 class="section-title">Animation · 動畫</h3>
+      <div class="anim-grid" id="animGrid">
+        <button class="anim-card active" data-anim="breathe">
+          <span class="name">Breathe</span>
+          <span class="zh">呼吸 · brightness pulse</span>
+        </button>
+        <button class="anim-card" data-anim="wave">
+          <span class="name">Wave</span>
+          <span class="zh">波浪 · vertical sine</span>
+        </button>
+        <button class="anim-card" data-anim="twist">
+          <span class="name">Twist</span>
+          <span class="zh">扭動 · rotate &amp; skew</span>
+        </button>
+        <button class="anim-card" data-anim="typewriter">
+          <span class="name">Typewriter</span>
+          <span class="zh">打字機 · stagger in</span>
+        </button>
+        <button class="anim-card" data-anim="flow">
+          <span class="name">Flow</span>
+          <span class="zh">流動 · opacity travels</span>
+        </button>
+        <button class="anim-card" data-anim="weight">
+          <span class="name">Weight wave</span>
+          <span class="zh">字重波 · variable axis</span>
+        </button>
+      </div>
+
+      <!-- Common params -->
+      <div class="slider-row">
+        <div class="slider-head"><span class="slider-label">Speed <span class="slider-zh">速度</span></span><span class="slider-value" id="speedVal">1.00×</span></div>
+        <input id="speed" type="range" min="0.1" max="3" step="0.05" value="1" />
+      </div>
+      <div class="slider-row">
+        <div class="slider-head"><span class="slider-label">Amplitude <span class="slider-zh">幅度</span></span><span class="slider-value" id="ampVal">0.60</span></div>
+        <input id="amp" type="range" min="0" max="1" step="0.01" value="0.6" />
+      </div>
+      <div class="slider-row">
+        <div class="slider-head"><span class="slider-label">Spread <span class="slider-zh">字間相位</span></span><span class="slider-value" id="spreadVal">0.18</span></div>
+        <input id="spread" type="range" min="0" max="1" step="0.01" value="0.18" />
+        <div class="hint" style="padding:0;margin-top:-2px">Phase offset between characters. 0 = synced, 1 = wide stagger.</div>
+      </div>
+      <div class="slider-row" id="softnessRow">
+        <div class="slider-head"><span class="slider-label">Softness <span class="slider-zh">柔和度</span></span><span class="slider-value" id="softVal">0.50</span></div>
+        <input id="softness" type="range" min="0.05" max="1" step="0.01" value="0.5" />
+        <div class="hint" style="padding:0;margin-top:-2px">For Flow: width of the bright spotlight. Narrower = sharper traveling highlight.</div>
+      </div>
+    </section>
+
+    <!-- Color -->
+    <section class="section">
+      <h3 class="section-title">Color · 顏色</h3>
+      <div class="swatches" id="swatches">
+        <button class="swatch active" data-color="#f3eee6" style="background:#f3eee6" title="Bone"></button>
+        <button class="swatch" data-color="#ffffff" style="background:#ffffff" title="Pure white"></button>
+        <button class="swatch" data-color="#c87cff" style="background:#c87cff" title="Violet"></button>
+        <button class="swatch" data-color="#7fdcff" style="background:#7fdcff" title="Sky"></button>
+        <button class="swatch" data-color="#9bd3a7" style="background:#9bd3a7" title="Sage"></button>
+        <button class="swatch" data-color="#ffb27a" style="background:#ffb27a" title="Amber"></button>
+        <button class="swatch" data-color="#ff7a9c" style="background:#ff7a9c" title="Rose"></button>
+      </div>
+      <div class="actions">
+        <button class="btn" id="restartBtn">↻ Restart</button>
+        <button class="btn primary" id="pauseBtn">⏸ Pause</button>
+      </div>
+    </section>
+
+  </div>
+</aside>
+
+<script>
+(() => {
+  /* —— state —— */
+  const TWEAKS = /*EDITMODE-BEGIN*/{
+    "text": "輕輕呼吸  ·  breathe softly",
+    "family": "recursive",
+    "lang": "tc",
+    "size": 135,
+    "weight": 400,
+    "track": 0,
+    "anim": "breathe",
+    "speed": 1,
+    "amp": 0.6,
+    "spread": 0.18,
+    "softness": 0.5,
+    "color": "#f3eee6"
+  }/*EDITMODE-END*/;
+
+  const state = { ...TWEAKS, paused:false };
+
+  /* —— font stacks —— */
+  const FONT = {
+    sans:{
+      latin:'"Noto Sans", system-ui, sans-serif',
+      sc:'"Noto Sans SC", "Noto Sans", sans-serif',
+      tc:'"Noto Sans TC", "Noto Sans", sans-serif',
+      jp:'"Noto Sans JP", "Noto Sans", sans-serif',
+      kr:'"Noto Sans KR", "Noto Sans", sans-serif',
+    },
+    serif:{
+      latin:'"Noto Serif", "Iowan Old Style", Georgia, serif',
+      sc:'"Noto Serif SC", "Noto Serif", serif',
+      tc:'"Noto Serif TC", "Noto Serif", serif',
+      jp:'"Noto Serif JP", "Noto Serif", serif',
+      kr:'"Noto Serif KR", "Noto Serif", serif',
+    },
+    recursive:{
+      latin:'"Recursive", system-ui, sans-serif',
+      sc:'"Recursive", "Noto Sans SC", sans-serif',
+      tc:'"Recursive", "Noto Sans TC", sans-serif',
+      jp:'"Recursive", "Noto Sans JP", sans-serif',
+      kr:'"Recursive", "Noto Sans KR", sans-serif',
+    },
+  };
+
+  /* —— DOM refs —— */
+  const stage = document.getElementById('typeStage');
+  const textInput = document.getElementById('textInput');
+  const statusEl = document.getElementById('status');
+  const panel = document.getElementById('panel');
+  const reopen = document.getElementById('reopen');
+  const closeBtn = document.getElementById('closeBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+
+  /* —— text rendering: split into chars + words —— */
+  let chars = []; // {el, i}
+  let startTime = performance.now();
+  function buildText(t){
+    stage.innerHTML = '';
+    chars = [];
+    // Split by spaces into words so wrapping looks natural; keep CJK chars as individual char nodes.
+    const tokens = t.split(/(\s+)/); // keep whitespace
+    let charIdx = 0;
+    tokens.forEach(tok => {
+      if(tok === '') return;
+      if(/^\s+$/.test(tok)){
+        // render as a thin space between words
+        const sp = document.createElement('span');
+        sp.className = 'ch space';
+        stage.appendChild(sp);
+        return;
+      }
+      // Group consecutive Latin letters into a "word" wrapper so they wrap together
+      const isLatin = (c) => /[A-Za-z0-9'\-]/.test(c);
+      let i = 0;
+      while(i < tok.length){
+        if(isLatin(tok[i])){
+          // collect run of latin chars into a word wrapper
+          const word = document.createElement('span');
+          word.className = 'word';
+          while(i < tok.length && isLatin(tok[i])){
+            const ch = document.createElement('span');
+            ch.className = 'ch';
+            ch.textContent = tok[i];
+            ch.dataset.i = charIdx;
+            word.appendChild(ch);
+            chars.push({el:ch, i:charIdx});
+            charIdx++;
+            i++;
+          }
+          stage.appendChild(word);
+        } else {
+          const ch = document.createElement('span');
+          ch.className = 'ch';
+          ch.textContent = tok[i];
+          ch.dataset.i = charIdx;
+          stage.appendChild(ch);
+          chars.push({el:ch, i:charIdx});
+          charIdx++;
+          i++;
+        }
+      }
+    });
+    applyStaticStyles();
+    startTime = performance.now();
+  }
+
+  /* —— apply non-animated styles (font, size, color, weight, tracking) —— */
+  function applyStaticStyles(){
+    const fontStack = (FONT[state.family] && FONT[state.family][state.lang]) || FONT.sans.latin;
+    stage.style.fontFamily = fontStack;
+    stage.style.fontSize = state.size + 'px';
+    stage.style.color = state.color;
+    stage.style.letterSpacing = state.track + 'em';
+    if(state.family === 'recursive'){
+      // variable axes — start at chosen weight
+      stage.style.fontWeight = state.weight;
+      stage.style.fontVariationSettings = `"wght" ${state.weight}, "slnt" 0`;
+    } else {
+      stage.style.fontWeight = state.weight;
+      stage.style.fontVariationSettings = 'normal';
+    }
+    // status line
+    const famLabel = state.family === 'recursive' ? 'Recursive · var'
+                    : state.family === 'serif' ? 'Noto Serif' : 'Noto Sans';
+    const langLabel = ({latin:'Latin', sc:'简体', tc:'繁體', jp:'日本語', kr:'한글'})[state.lang] || '';
+    statusEl.textContent = `Live · ${famLabel} · ${langLabel}`;
+  }
+
+  /* —— animation loop —— */
+  let pausedAt = 0;
+  let pauseOffset = 0;
+  function tick(now){
+    if(state.paused){
+      // freeze: do nothing, but keep RAF for resume
+      requestAnimationFrame(tick);
+      return;
+    }
+    const t = ((now - startTime) - pauseOffset) / 1000; // seconds
+    applyAnim(t);
+    requestAnimationFrame(tick);
+  }
+
+  /* —— per-frame animation logic —— */
+  function applyAnim(t){
+    const n = chars.length;
+    if(!n) return;
+    const speed = state.speed;
+    const amp = state.amp;
+    const spread = state.spread;
+    const soft = state.softness;
+    const anim = state.anim;
+
+    // pre-clear filter/transform overrides on space nodes (they don't animate)
+    for(let k=0;k<n;k++){
+      const c = chars[k];
+      const i = c.i;
+      const phase = i * spread; // chars-only index
+
+      switch(anim){
+        case 'breathe': {
+          // each char gets a brightness pulse with a per-char phase
+          const v = 0.5 + 0.5*Math.sin((t*speed*1.4 - phase) * Math.PI);
+          // map v (0..1) to opacity / brightness
+          const op = 1 - amp + amp*v;
+          c.el.style.opacity = op.toFixed(3);
+          c.el.style.transform = 'translateZ(0)';
+          c.el.style.filter = `brightness(${(0.6 + 0.5*v).toFixed(3)})`;
+          c.el.style.fontVariationSettings = '';
+          break;
+        }
+        case 'wave': {
+          const y = Math.sin((t*speed*1.6 - phase*1.2) * Math.PI) * amp * (state.size*0.18);
+          c.el.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`;
+          c.el.style.opacity = '1';
+          c.el.style.filter = '';
+          c.el.style.fontVariationSettings = '';
+          break;
+        }
+        case 'twist': {
+          const rot = Math.sin((t*speed*1.2 - phase*1.0) * Math.PI) * amp * 22; // deg
+          const sk = Math.cos((t*speed*1.0 - phase*0.8) * Math.PI) * amp * 8;
+          c.el.style.transform = `rotate(${rot.toFixed(2)}deg) skewX(${sk.toFixed(2)}deg)`;
+          c.el.style.opacity = '1';
+          c.el.style.filter = '';
+          if(state.family === 'recursive'){
+            const slant = -Math.abs(Math.sin((t*speed*1.2 - phase) * Math.PI)) * amp * 14;
+            c.el.style.fontVariationSettings = `"wght" ${state.weight}, "slnt" ${slant.toFixed(2)}`;
+          } else {
+            c.el.style.fontVariationSettings = '';
+          }
+          break;
+        }
+        case 'typewriter': {
+          // characters reveal one by one, looping with a tail.
+          const cycle = n + Math.max(4, n*0.4); // cycle length with hold
+          const cursorPos = ((t*speed*6) % cycle);
+          const idx = i; // char index in order
+          let op = 0;
+          if(cursorPos > cycle - n*0.3){
+            // fade-out tail
+            const tail = cursorPos - (cycle - n*0.3);
+            const fadeStart = tail / (n*0.3) * n;
+            op = idx < fadeStart ? Math.max(0, 1 - (fadeStart - idx)) : 1;
+          } else {
+            // typing in
+            op = idx < cursorPos ? 1 : (idx < cursorPos + 1 ? (cursorPos - idx) : 0);
+          }
+          // amp controls min opacity (so amp=0 = fully visible)
+          const minOp = 1 - amp;
+          op = minOp + (1-minOp)*op;
+          c.el.style.opacity = op.toFixed(3);
+          c.el.style.transform = '';
+          c.el.style.filter = '';
+          c.el.style.fontVariationSettings = '';
+          break;
+        }
+        case 'flow': {
+          // a bright spotlight travels through the line
+          // position of head, in char-units, loops past the end
+          const head = ((t*speed*0.7) % 1) * (n + n*0.4) - n*0.2;
+          const dist = i - head;
+          // gaussian-ish falloff; soft controls width
+          const width = Math.max(0.3, soft * n * 0.5 + 0.5);
+          const g = Math.exp(-(dist*dist)/(2*width*width));
+          const base = 1 - amp;
+          const op = base + (1-base) * g;
+          c.el.style.opacity = op.toFixed(3);
+          c.el.style.transform = '';
+          c.el.style.filter = `brightness(${(0.7 + 0.7*g).toFixed(3)})`;
+          c.el.style.fontVariationSettings = '';
+          break;
+        }
+        case 'weight': {
+          // variable-font weight wave; falls back to opacity if not recursive
+          const v = 0.5 + 0.5*Math.sin((t*speed*1.2 - phase) * Math.PI);
+          if(state.family === 'recursive'){
+            const minW = 300, maxW = 1000;
+            const w = minW + (maxW - minW) * (1 - amp + amp*v);
+            c.el.style.fontVariationSettings = `"wght" ${w.toFixed(1)}, "slnt" 0`;
+            c.el.style.opacity = '1';
+            c.el.style.transform = '';
+            c.el.style.filter = '';
+          } else {
+            // approximate weight via opacity+blur
+            c.el.style.opacity = (0.4 + 0.6*v).toFixed(3);
+            c.el.style.filter = `blur(${((1-v)*amp*0.6).toFixed(2)}px)`;
+            c.el.style.transform = '';
+            c.el.style.fontVariationSettings = '';
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  /* —— controls wiring —— */
+  function setSliderProgress(input){
+    const min = +input.min, max = +input.max, val = +input.value;
+    const p = ((val - min) / (max - min)) * 100;
+    input.style.setProperty('--p', p + '%');
+  }
+  function bindSlider(id, key, formatter){
+    const input = document.getElementById(id);
+    const valEl = document.getElementById(id + 'Val');
+    input.value = state[key];
+    setSliderProgress(input);
+    if(valEl) valEl.textContent = formatter(state[key]);
+    input.addEventListener('input', () => {
+      const v = +input.value;
+      state[key] = v;
+      setSliderProgress(input);
+      if(valEl) valEl.textContent = formatter(v);
+      if(key === 'size' || key === 'weight' || key === 'track') applyStaticStyles();
+      persist({[key]: v});
+    });
+  }
+
+  bindSlider('size','size', v => Math.round(v));
+  bindSlider('weight','weight', v => Math.round(v));
+  bindSlider('track','track', v => v.toFixed(3));
+  bindSlider('speed','speed', v => v.toFixed(2) + '×');
+  bindSlider('amp','amp', v => v.toFixed(2));
+  bindSlider('spread','spread', v => v.toFixed(2));
+  bindSlider('softness','softness', v => v.toFixed(2));
+
+  // family seg
+  document.querySelectorAll('#familySeg button').forEach(b => {
+    if(b.dataset.family === state.family) b.classList.add('active');
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#familySeg button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      state.family = b.dataset.family;
+      applyStaticStyles();
+      persist({family: state.family});
+    });
+  });
+
+  // lang grid
+  document.querySelectorAll('#langGrid button').forEach(b => {
+    if(b.dataset.lang === state.lang) b.classList.add('active'); else b.classList.remove('active');
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#langGrid button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      state.lang = b.dataset.lang;
+      applyStaticStyles();
+      persist({lang: state.lang});
+    });
+  });
+
+  // anim grid
+  document.querySelectorAll('#animGrid .anim-card').forEach(b => {
+    if(b.dataset.anim === state.anim) b.classList.add('active'); else b.classList.remove('active');
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#animGrid .anim-card').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      state.anim = b.dataset.anim;
+      // reset any leftover transforms when switching modes
+      chars.forEach(c => {
+        c.el.style.transform = '';
+        c.el.style.opacity = '';
+        c.el.style.filter = '';
+        c.el.style.fontVariationSettings = '';
+      });
+      startTime = performance.now();
+      pauseOffset = 0;
+      persist({anim: state.anim});
+    });
+  });
+
+  // swatches
+  document.querySelectorAll('.swatch').forEach(s => {
+    if(s.dataset.color === state.color) s.classList.add('active');
+    s.addEventListener('click', () => {
+      document.querySelectorAll('.swatch').forEach(x => x.classList.remove('active'));
+      s.classList.add('active');
+      state.color = s.dataset.color;
+      applyStaticStyles();
+      persist({color: state.color});
+    });
+  });
+
+  // text input — live update with light debounce
+  let textDeb;
+  textInput.value = state.text;
+  textInput.addEventListener('input', () => {
+    state.text = textInput.value;
+    clearTimeout(textDeb);
+    textDeb = setTimeout(() => {
+      buildText(state.text || ' ');
+      persist({text: state.text});
+    }, 60);
+  });
+
+  // panel open/close
+  closeBtn.addEventListener('click', () => {
+    panel.classList.add('closed');
+    reopen.classList.add('show');
+  });
+  reopen.addEventListener('click', () => {
+    panel.classList.remove('closed');
+    reopen.classList.remove('show');
+  });
+
+  // restart / pause
+  restartBtn.addEventListener('click', () => {
+    startTime = performance.now();
+    pauseOffset = 0;
+  });
+  pauseBtn.addEventListener('click', () => {
+    if(state.paused){
+      // resume
+      state.paused = false;
+      pauseOffset += performance.now() - pausedAt;
+      pauseBtn.innerHTML = '⏸ Pause';
+    } else {
+      state.paused = true;
+      pausedAt = performance.now();
+      pauseBtn.innerHTML = '▶ Play';
+    }
+  });
+
+  // persist to host file (for restored state across reloads via Tweaks)
+  function persist(edits){
+    try{
+      window.parent.postMessage({type:'__edit_mode_set_keys', edits}, '*');
+    }catch(_){}
+  }
+
+  // initial build
+  buildText(state.text);
+  requestAnimationFrame(tick);
+
+  // keyboard niceties
+  window.addEventListener('keydown', e => {
+    if(e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+    if(e.code === 'Space'){ e.preventDefault(); pauseBtn.click(); }
+    if(e.key === 'r' || e.key === 'R') restartBtn.click();
+    if(e.key === '\\') { panel.classList.contains('closed') ? reopen.click() : closeBtn.click(); }
+  });
+})();
+</script>
+</body>
+</html>
