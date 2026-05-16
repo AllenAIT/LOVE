@@ -541,7 +541,7 @@
         <input type="text" class="imagine-input" id="imagineInput" placeholder="Describe a feeling… 今天心如深海 ・ wistful golden hour…" />
         <button class="imagine-btn" id="imagineBtn">Imagine</button>
       </div>
-      <div class="imagine-hint" id="imagineHint">— type in any language, AI will translate to a field</div>
+      <div class="imagine-hint" id="imagineHint">— type any feeling, animal, color, zodiac, anything — translated into a field</div>
     </div>
 
     <!-- Quick action bar (always visible) -->
@@ -3418,29 +3418,377 @@ function applySnapshot(snap, opts){
   updateReadout();
 }
 
-/* — Imagine: call Claude via artifact runtime when available; otherwise fall
-   back to a Vercel serverless function at /api/imagine. Add ANTHROPIC_API_KEY
-   to your Vercel env vars and deploy `api/imagine.js` (see CUSTOM_EFFECTS.md
-   or the api/ folder in this project). — */
-async function callClaude(prompt){
-  if(typeof window !== 'undefined' && window.claude && typeof window.claude.complete === 'function'){
-    return await window.claude.complete(prompt);
+/* — Local imagine: translate any text to a visual snapshot using a unified
+   dictionary that maps emotions, animals, zodiacs, colors, nature, elements,
+   body, sensual/profane words — down to single-character hints — to mood
+   archetypes. Hash fallback so even gibberish produces something pretty.
+   100% offline, deterministic, no API, no env vars, never refuses. — */
+
+// Mood archetypes: full parameter sets, blended when multiple match.
+const MOOD_PRESETS = {
+  warm:       { values:{love:60,hope:45,joy:25,calm:20},   temp:45, vibrance:72, hueShift:8,   bgDark:0.20, bloom:0.55, trails:0.15, grain:0.40, vignette:0.40, density:1.10, motionSpeed:0.7, turbulence:0.25, glow:0.95, kaleido:0,  modes:[],                              poem:'溫如夕陽' },
+  love:       { values:{love:90,joy:35,hope:40,calm:20},   temp:52, vibrance:78, hueShift:0,   bgDark:0.25, bloom:0.72, trails:0.28, grain:0.35, vignette:0.50, density:1.20, motionSpeed:0.8, turbulence:0.30, glow:1.05, kaleido:0,  modes:['petals'],                      poem:'心底開花' },
+  tender:     { values:{love:60,calm:50,hope:30},          temp:38, vibrance:65, hueShift:6,   bgDark:0.22, bloom:0.65, trails:0.25, grain:0.30, vignette:0.45, density:1.00, motionSpeed:0.55,turbulence:0.18, glow:0.95, kaleido:0,  modes:['petals'],                      poem:'柔軟如棉' },
+  lust:       { values:{desire:90,love:45,anger:18,joy:22},temp:78, vibrance:88, hueShift:-12, bgDark:0.55, bloom:0.88, trails:0.55, grain:0.55, vignette:0.65, density:1.35, motionSpeed:1.2, turbulence:0.70, glow:1.30, kaleido:0,  modes:['ribbons','flowField'],         poem:'欲火低語' },
+  yearning:   { values:{desire:55,sadness:50,love:35},     temp:42, vibrance:60, hueShift:-18, bgDark:0.50, bloom:0.55, trails:0.65, grain:0.40, vignette:0.55, density:0.90, motionSpeed:0.55,turbulence:0.30, glow:0.85, kaleido:0,  modes:['ribbons'],                     poem:'掛在心上' },
+  joy:        { values:{joy:90,hope:50,curiosity:30},      temp:62, vibrance:90, hueShift:18,  bgDark:0.10, bloom:0.65, trails:0.10, grain:0.35, vignette:0.30, density:1.30, motionSpeed:1.4, turbulence:0.45, glow:1.05, kaleido:0,  modes:[],                              poem:'光在跳舞' },
+  euphoric:   { values:{joy:75,desire:60,awe:40,hope:35},  temp:82, vibrance:96, hueShift:24,  bgDark:0.20, bloom:0.85, trails:0.30, grain:0.45, vignette:0.45, density:1.50, motionSpeed:1.8, turbulence:0.80, glow:1.35, kaleido:6,  modes:['spiral','ribbons'],            poem:'天旋地轉' },
+  excited:    { values:{joy:65,curiosity:55,hope:40},      temp:72, vibrance:85, hueShift:14,  bgDark:0.15, bloom:0.55, trails:0.15, grain:0.40, vignette:0.35, density:1.35, motionSpeed:1.7, turbulence:0.70, glow:1.10, kaleido:0,  modes:['flowField'],                   poem:'心跳加速' },
+  playful:    { values:{joy:60,curiosity:50,love:25},      temp:60, vibrance:80, hueShift:22,  bgDark:0.15, bloom:0.55, trails:0.10, grain:0.35, vignette:0.30, density:1.25, motionSpeed:1.5, turbulence:0.55, glow:0.95, kaleido:0,  modes:['constellation'],               poem:'像泡泡跳舞' },
+  hope:       { values:{hope:80,joy:35,calm:30,love:25},   temp:50, vibrance:68, hueShift:14,  bgDark:0.15, bloom:0.60, trails:0.18, grain:0.35, vignette:0.35, density:1.15, motionSpeed:0.85,turbulence:0.30, glow:1.00, kaleido:0,  modes:[],                              poem:'晨光初亮' },
+  calm:       { values:{calm:80,hope:30},                  temp:25, vibrance:50, hueShift:-8,  bgDark:0.35, bloom:0.40, trails:0.55, grain:0.30, vignette:0.50, density:0.85, motionSpeed:0.45,turbulence:0.10, glow:0.75, kaleido:0,  modes:[],                              poem:'呼吸如水' },
+  peaceful:   { values:{calm:65,hope:40,love:25},          temp:30, vibrance:55, hueShift:0,   bgDark:0.25, bloom:0.50, trails:0.40, grain:0.30, vignette:0.45, density:0.95, motionSpeed:0.50,turbulence:0.15, glow:0.85, kaleido:0,  modes:[],                              poem:'萬籟俱寂' },
+  dreamy:     { values:{awe:60,calm:35,love:25,curiosity:30},temp:45,vibrance:75, hueShift:50, bgDark:0.40, bloom:0.85, trails:0.55, grain:0.35, vignette:0.55, density:1.00, motionSpeed:0.65,turbulence:0.25, glow:1.20, kaleido:8,  modes:['mandalaRings','ribbons'],      poem:'夢的褶皺'},
+  mystic:     { values:{awe:65,fear:25,curiosity:30,grief:20},temp:38,vibrance:60,hueShift:70, bgDark:0.65, bloom:0.70, trails:0.55, grain:0.55, vignette:0.65, density:0.95, motionSpeed:0.55,turbulence:0.35, glow:1.05, kaleido:12, modes:['mandalaRings','tunnel'],       poem:'未知的呼喚' },
+  cosmic:     { values:{awe:85,curiosity:40,calm:25},      temp:35, vibrance:70, hueShift:80,  bgDark:0.70, bloom:0.80, trails:0.50, grain:0.50, vignette:0.60, density:0.95, motionSpeed:0.55,turbulence:0.30, glow:1.20, kaleido:8,  modes:['constellation','spiral'],      poem:'星塵流轉' },
+  ethereal:   { values:{awe:50,calm:40,hope:30},           temp:30, vibrance:60, hueShift:60,  bgDark:0.35, bloom:0.85, trails:0.65, grain:0.30, vignette:0.50, density:0.75, motionSpeed:0.55,turbulence:0.20, glow:1.25, kaleido:6,  modes:['ribbons','aurora'],            poem:'輕如薄翼' },
+  sad:        { values:{sadness:80,calm:25,grief:20},      temp:30, vibrance:42, hueShift:-25, bgDark:0.45, bloom:0.40, trails:0.55, grain:0.50, vignette:0.55, density:0.85, motionSpeed:0.50,turbulence:0.20, glow:0.70, kaleido:0,  modes:['ripples'],                     poem:'雨落在心' },
+  lonely:     { values:{sadness:55,grief:30,calm:30},      temp:22, vibrance:38, hueShift:-30, bgDark:0.60, bloom:0.35, trails:0.65, grain:0.55, vignette:0.65, density:0.55, motionSpeed:0.40,turbulence:0.15, glow:0.60, kaleido:0,  modes:[],                              poem:'一個人的房間' },
+  melancholy: { values:{sadness:55,calm:40,grief:25,love:18},temp:28,vibrance:48, hueShift:-22, bgDark:0.50, bloom:0.50, trails:0.60, grain:0.50, vignette:0.60, density:0.80, motionSpeed:0.50,turbulence:0.18, glow:0.75, kaleido:0,  modes:['ripples'],                     poem:'淡藍的午後' },
+  nostalgia:  { values:{sadness:35,hope:30,love:25,calm:25},temp:38, vibrance:55, hueShift:18, bgDark:0.40, bloom:0.55, trails:0.55, grain:0.65, vignette:0.55, density:0.90, motionSpeed:0.55,turbulence:0.20, glow:0.85, kaleido:0,  modes:['halftone'],                    poem:'記得那年' },
+  grief:      { values:{grief:85,sadness:50},              temp:18, vibrance:35, hueShift:-35, bgDark:0.70, bloom:0.45, trails:0.70, grain:0.55, vignette:0.70, density:0.65, motionSpeed:0.35,turbulence:0.25, glow:0.65, kaleido:0,  modes:['ripples'],                     poem:'沉入深處' },
+  bitter:     { values:{jealousy:65,anger:25,grief:30},    temp:48, vibrance:55, hueShift:42,  bgDark:0.45, bloom:0.45, trails:0.40, grain:0.55, vignette:0.55, density:1.00, motionSpeed:0.70,turbulence:0.55, glow:0.85, kaleido:0,  modes:['ribbons'],                     poem:'酸的綠光' },
+  anger:      { values:{anger:85,desire:25},               temp:78, vibrance:82, hueShift:-15, bgDark:0.35, bloom:0.55, trails:0.15, grain:0.55, vignette:0.50, density:1.30, motionSpeed:1.4, turbulence:1.20, glow:1.10, kaleido:0,  modes:['crystals'],                    poem:'血液在燒' },
+  rage:       { values:{anger:95,desire:35},               temp:92, vibrance:92, hueShift:-20, bgDark:0.40, bloom:0.65, trails:0.10, grain:0.60, vignette:0.55, density:1.45, motionSpeed:1.9, turbulence:1.70, glow:1.30, kaleido:0,  modes:['crystals','flowField'],        poem:'失控的閃光' },
+  fear:       { values:{fear:75,sadness:25},               temp:35, vibrance:35, hueShift:-50, bgDark:0.70, bloom:0.30, trails:0.25, grain:0.70, vignette:0.70, density:0.90, motionSpeed:0.85,turbulence:0.95, glow:0.55, kaleido:0,  modes:['halftone'],                    poem:'抖動的暗' },
+  horror:     { values:{fear:90,grief:40},                 temp:30, vibrance:28, hueShift:-60, bgDark:0.85, bloom:0.30, trails:0.20, grain:0.85, vignette:0.80, density:0.85, motionSpeed:0.95,turbulence:1.30, glow:0.50, kaleido:0,  modes:['halftone','tunnel'],           poem:'血肉之下' },
+  chaos:      { values:{anger:55,fear:50,curiosity:30,jealousy:25},temp:75,vibrance:75,hueShift:-5,bgDark:0.40,bloom:0.55,trails:0.20,grain:0.65,vignette:0.50,density:1.40,motionSpeed:1.8,turbulence:1.55,glow:1.00,kaleido:4,modes:['crystals','flowField'],               poem:'萬物碎裂' },
+  void:       { values:{grief:35,sadness:30,fear:20},      temp:12, vibrance:25, hueShift:-10, bgDark:0.85, bloom:0.25, trails:0.55, grain:0.55, vignette:0.75, density:0.40, motionSpeed:0.30,turbulence:0.10, glow:0.45, kaleido:0,  modes:[],                              poem:'空' },
+  focused:    { values:{calm:55,curiosity:35,hope:25},     temp:42, vibrance:58, hueShift:-30, bgDark:0.30, bloom:0.40, trails:0.25, grain:0.40, vignette:0.45, density:1.30, motionSpeed:0.55,turbulence:0.15, glow:0.75, kaleido:0,  modes:['constellation'],               poem:'針尖之上' },
+  awe:        { values:{awe:90,hope:30,curiosity:40},      temp:42, vibrance:72, hueShift:55,  bgDark:0.50, bloom:0.85, trails:0.45, grain:0.45, vignette:0.55, density:1.05, motionSpeed:0.65,turbulence:0.30, glow:1.25, kaleido:8,  modes:['mandalaRings'],                poem:'仰望深處' },
+  electric:   { values:{joy:50,anger:35,curiosity:45},     temp:75, vibrance:92, hueShift:30,  bgDark:0.40, bloom:0.70, trails:0.10, grain:0.50, vignette:0.45, density:1.35, motionSpeed:1.7, turbulence:1.10, glow:1.30, kaleido:0,  modes:['crystals','flowField'],        poem:'觸電的瞬間' },
+  raw:        { values:{anger:45,desire:35,awe:30},        temp:65, vibrance:60, hueShift:-12, bgDark:0.45, bloom:0.50, trails:0.20, grain:0.65, vignette:0.55, density:1.30, motionSpeed:1.3, turbulence:0.95, glow:0.90, kaleido:0,  modes:['flowField'],                   poem:'原始的火' },
+};
+
+// Dictionary: 350+ Chinese/English words mapped to mood archetypes.
+// One word can blend multiple moods. Longest-match wins on overlap.
+const WORDS = {
+  '開心':['joy'], '快樂':['joy'], '高興':['joy'], '喜悦':['joy'], '歡喜':['joy'], '愉快':['joy'],
+  '歡樂':['joy','playful'], '雀躍':['excited','joy'], '興奮':['excited'], '激動':['excited','euphoric'],
+  '狂喜':['euphoric'], '狂歡':['euphoric'], '陶醉':['euphoric','dreamy'], '迷醉':['euphoric','dreamy'],
+  '滿足':['peaceful'], '滿意':['peaceful'], '知足':['peaceful'], '舒服':['peaceful','warm'],
+  '幸福':['warm','love'], '甜蜜':['love','warm'], '溫馨':['warm','tender'], '感動':['tender','love'],
+  '愛':['love'], '愛情':['love'], '戀愛':['love'], '相愛':['love','warm'], '愛你':['love'],
+  '喜歡':['love','warm'], '喜愛':['love'], '愛慕':['love','yearning'],
+  '暗戀':['yearning','love'], '單戀':['yearning'], '失戀':['grief','sad'],
+  '思念':['yearning'], '想念':['yearning'], '想你':['yearning'], '掛念':['yearning','tender'],
+  '懷念':['nostalgia'], '懷舊':['nostalgia'],
+  '心動':['love','excited'], '浪漫':['love','dreamy'],
+  '親密':['love','tender'], '親近':['love','calm'],
+  '依偎':['tender','love'], '相擁':['tender','love'], '擁抱':['tender','warm'],
+  '撒嬌':['playful','love'], '寵':['tender','love'],
+  '欲望':['lust'], '性欲':['lust'], '情欲':['lust'], '色欲':['lust'], '肉欲':['lust'],
+  '做愛':['lust','love'], '性愛':['lust'], '性':['lust'],
+  '激情':['lust','euphoric'], '火熱':['lust','warm'], '熱情':['lust','warm','euphoric'],
+  '渴望':['yearning','lust'], '餓渴':['lust'], '欲火':['lust','rage'],
+  '銷魂':['lust','euphoric'], '纏綿':['lust','tender'],
+  '撩':['lust','playful'], '撩人':['lust'], '勾引':['lust','mystic'],
+  '挑逗':['lust','playful'], '誘惑':['lust','mystic'], '誘人':['lust'],
+  '高潮':['euphoric','lust'], '快感':['euphoric'], '射':['lust'],
+  '床':['lust','calm'],
+  '性感':['lust'], '媹媳':['lust','tender'], '撫摸':['lust','tender'], '愛撫':['lust','tender'],
+  '吻':['love','lust'], '親吻':['love'], '舌吻':['lust'],
+  '操':['lust'], '幹':['lust'], '插':['lust'], '射精':['lust','euphoric'],
+  '雞巴':['lust'], '屌':['lust'], '陰道':['lust'], '陰部':['lust'], '陰莖':['lust'], '陰戶':['lust'],
+  '奶':['lust'], '奶子':['lust'], '胸部':['lust','tender'], '乳':['lust'], '乳房':['lust','tender'],
+  '屁股':['lust'], '臀':['lust'], '臀部':['lust'],
+  '唇':['lust','tender'], '舌':['lust'],
+  '裸':['lust','raw'], '裸體':['lust','raw'], '裸露':['lust','raw'],
+  '色':['lust'], '色情':['lust'], '春':['lust','hope'],
+  '悲傷':['sad'], '難過':['sad'], '傷心':['sad'], '心碎':['grief','sad'], '心痛':['grief'],
+  '哀傷':['grief'], '哀痛':['grief'], '哀愁':['melancholy'],
+  '痛苦':['grief'], '苦':['bitter','grief'], '苦悶':['melancholy','grief'],
+  '絕望':['grief','void'], '失望':['sad'], '失落':['sad','lonely'],
+  '沮喪':['sad','melancholy'], '消沉':['melancholy'],
+  '憂鬱':['melancholy'], '抑鬱':['melancholy'], '陰鬱':['melancholy','mystic'], '憂':['melancholy'],
+  '寂寞':['lonely'], '孤獨':['lonely'], '孤單':['lonely'], '孤':['lonely'],
+  '思鄉':['nostalgia','lonely'], '想家':['nostalgia'],
+  '遺憾':['nostalgia','grief'], '後悔':['grief','bitter'],
+  '委屈':['sad','tender'], '哭':['sad'], '流淚':['sad'], '眼淚':['sad'], '哭泣':['sad'],
+  '崩潰':['grief','chaos'],
+  '空虛':['void'], '虛無':['void'], '迷茫':['void','lonely'], '迷惘':['void','lonely'],
+  '麻木':['void'], '冷漠':['void','calm'],
+  '無聊':['void','lonely'], '厌倦':['void','sad'], '無奈':['melancholy','void'],
+  '疲懊':['sad','void'], '累':['sad','void'], '倦':['void','sad'],
+  '生氣':['anger'], '憤怒':['anger'], '怒':['anger'],
+  '怒火':['rage'], '暴怒':['rage'], '狂怒':['rage'], '盛怒':['rage'],
+  '不爽':['anger','bitter'], '煩':['anger','chaos'], '煩躁':['anger','chaos'],
+  '怨':['bitter','grief'], '怨恨':['bitter','anger'], '仇恨':['anger','bitter'], '仇':['anger','bitter'],
+  '抓狂':['rage','chaos'], '失控':['rage','chaos'],
+  '憤':['anger'], '恨':['anger','bitter'], '討厭':['anger','bitter'],
+  '嫉妝':['bitter'], '妝忌':['bitter'], '羡慕':['bitter','yearning'],
+  '不甘':['bitter','anger'],
+  '害怕':['fear'], '恐懼':['fear'], '驚嚇':['fear'], '怕':['fear'],
+  '恐怖':['horror'], '驚悚':['horror'], '可怕':['horror','fear'],
+  '緊張':['fear','chaos'], '焦慮':['fear'], '不安':['fear'],
+  '慌':['fear','chaos'], '慌張':['fear','chaos'],
+  '顏抖':['fear'], '發抖':['fear'], '噩夢':['fear','mystic'],
+  '夢':['dreamy'], '夢幻':['dreamy'], '夢境':['dreamy','mystic'], '美夢':['dreamy','joy'],
+  '幻想':['dreamy'], '幻覺':['mystic','dreamy'], '迷幻':['mystic','dreamy'], '幻':['dreamy'],
+  '神秘':['mystic'], '玄妙':['mystic'], '神聖':['awe','mystic'], '聖':['ethereal','awe'],
+  '魔法':['mystic','dreamy'], '魔幻':['mystic','dreamy'], '魔':['mystic'],
+  '靈魂':['ethereal','mystic'], '靈性':['ethereal'], '靈':['ethereal'],
+  '冥想':['calm','focused'], '禪':['calm','focused','ethereal'],
+  '永恆':['cosmic','awe'], '無限':['cosmic','awe'],
+  '宇宙':['cosmic','awe'], '時空':['cosmic'], '星空':['cosmic','dreamy'], '銀河':['cosmic'],
+  '虛幻':['ethereal','dreamy'], '飄渺':['ethereal'],
+  '寧靜':['calm'], '平靜':['calm'], '安詳':['calm','peaceful'], '安寧':['calm','peaceful'],
+  '平和':['peaceful','calm'], '和誧':['peaceful'],
+  '放鬆':['calm'], '自在':['calm','peaceful'],
+  '專注':['focused'], '專心':['focused'], '投入':['focused'],
+  '冷靜':['focused','calm'], '清醒':['focused'],
+  '希望':['hope'], '期待':['hope','excited'], '盼望':['hope','yearning'],
+  '樂觀':['hope','joy'], '自信':['hope','warm'],
+  '勇敢':['hope','raw'], '堅強':['hope','focused'],
+  '好奇':['excited','playful'], '驚奇':['awe'], '驚嘆':['awe'], '神奇':['awe','mystic'],
+  '震撇':['awe','euphoric'],
+  '自由':['hope','electric'], '解脱':['peaceful','hope'],
+  '重生':['hope','warm'], '新生':['hope'],
+  '死亡':['grief','void'], '死':['grief'], '亡':['grief','void'],
+  '困惑':['chaos'], '疑惑':['chaos'], '矛盾':['chaos'],
+  '混亂':['chaos'], '紛亂':['chaos'],
+  '振奮':['excited','hope'], '熱血':['excited','warm','raw'],
+  '衝動':['electric','rage'], '溫暖':['warm'],
+  '紅色':['lust','anger'], '紅':['lust','warm'],
+  '橙色':['warm','joy'], '橙':['warm','joy'],
+  '黃色':['joy','warm'], '黃':['joy','warm'],
+  '綠色':['calm','bitter'], '綠':['calm','peaceful'],
+  '藍色':['sad','calm'], '藍':['calm','sad'],
+  '紫色':['mystic','dreamy'], '紫':['mystic','dreamy'],
+  '粉色':['love','tender'], '粉':['love','tender'], '粉紅':['love','tender'],
+  '黑色':['void','mystic'], '白色':['ethereal','peaceful'],
+  '灰色':['melancholy','void'], '灰':['melancholy'],
+  '金色':['warm','euphoric'], '銀色':['ethereal','mystic'], '銀':['ethereal'],
+  '深藍':['mystic','sad'], '靛':['mystic','grief'],
+  '海':['calm','cosmic'], '海洋':['calm','cosmic'], '大海':['calm','cosmic'], '深海':['mystic','calm'],
+  '山':['focused','peaceful'], '高山':['awe','focused'], '雪山':['lonely','focused'],
+  '河':['calm'], '河流':['calm'], '湖':['calm','peaceful'], '溪':['playful','calm'],
+  '森林':['calm','mystic'], '草原':['peaceful','hope'], '田野':['peaceful'],
+  '沙漠':['lonely','void'], '荒野':['lonely','raw'],
+  '火山':['rage','lust'], '瀑布':['euphoric','raw'],
+  '天空':['hope','peaceful'], '雲':['dreamy','calm'], '雲朵':['dreamy','calm'], '彩虹':['joy','hope'],
+  '星星':['cosmic','dreamy'], '星辰':['cosmic'], '流星':['yearning','cosmic'],
+  '月亮':['dreamy','melancholy'], '月光':['dreamy','tender'],
+  '太陽':['joy','warm','hope'], '陽光':['joy','warm'],
+  '下雨':['sad'], '暴雨':['chaos','grief'], '飄雪':['calm','lonely'], '雪花':['calm','dreamy'],
+  '微風':['calm','peaceful'], '暴風':['chaos','rage'], '颱風':['chaos','rage'],
+  '迷霧':['mystic'], '閃電':['electric','rage'], '雷電':['electric','rage'],
+  '春天':['hope','joy'], '夏天':['euphoric','joy'], '秋天':['nostalgia'], '冬天':['lonely','calm'],
+  '黎明':['hope','warm'], '黃昏':['nostalgia','warm'], '日落':['nostalgia','warm'], '日出':['hope','warm'],
+  '午夜':['mystic','void'], '深夜':['mystic','lonely'], '黑夜':['mystic','void'],
+  '清晨':['hope','peaceful'], '白晝':['joy','peaceful'],
+  '貓':['calm','playful','mystic'], '小貓':['playful','tender'],
+  '狗':['joy','warm'], '小狗':['joy','playful'],
+  '兔':['playful','tender'], '兔子':['playful','tender'],
+  '老虎':['rage','raw','focused'], '虎':['raw','focused'],
+  '獅子':['rage','focused','warm'], '獅':['focused','warm'],
+  '狼':['lonely','focused','raw'], '熊':['warm','focused','raw'],
+  '狐狸':['mystic','playful'], '狐':['mystic','playful'],
+  '鹿':['tender','calm'], '小鹿':['tender'],
+  '馬':['raw','hope','focused'],
+  '牛':['focused','calm'], '羊':['tender','peaceful'],
+  '豬':['playful','warm'], '猴':['playful','chaos'], '猴子':['playful'],
+  '大象':['calm','grief','tender'], '象':['calm','tender'],
+  '鮸':['awe','cosmic'], '鮸魚':['awe','cosmic'], '海豚':['joy','playful'],
+  '鯊魚':['focused','fear'], '章魚':['mystic'],
+  '水母':['ethereal','dreamy'], '魚':['calm','playful'],
+  '蝴蝶':['joy','dreamy','tender'], '蝶':['dreamy','tender'],
+  '蜜蜂':['focused','excited'], '蜂':['excited'],
+  '螢火蟲':['dreamy','mystic'], '螢':['dreamy','mystic'],
+  '蜘蛛':['fear','mystic'], '蝙蝠':['mystic','fear'],
+  '蛇':['mystic','fear','focused'], '蜥蜴':['focused','mystic'],
+  '烏龜':['calm','focused'], '龜':['calm'],
+  '鳥':['hope','peaceful'], '小鳥':['playful','hope'],
+  '鷹':['focused','raw','hope'], '烏鴉':['mystic','lonely'], '鴉':['mystic'],
+  '鴿子':['peaceful','hope'], '鴿':['peaceful'],
+  '孔雀':['euphoric','warm'], '天鵝':['ethereal','tender'],
+  '貓頭鷹':['mystic','focused'],
+  '鳳凰':['rage','hope','euphoric'], '鳳':['hope','euphoric'],
+  '龍':['awe','raw','mystic'], '麒麟':['awe','mystic'],
+  '獨角獸':['dreamy','ethereal','hope'],
+  '白羊座':['rage','raw','hope'], '白羊':['rage','raw','hope'],
+  '金牛座':['focused','warm','peaceful'], '金牛':['focused','warm'],
+  '雙子座':['playful','curiosity','chaos'], '雙子':['playful','excited'],
+  '巨蟹座':['tender','melancholy','love'], '巨蟹':['tender','melancholy'],
+  '獅子座':['euphoric','warm','rage'],
+  '處女座':['focused','calm'], '處女':['focused','calm'],
+  '天秤座':['peaceful','ethereal'], '天秤':['peaceful','ethereal'],
+  '天蝍座':['lust','mystic','focused'], '天蝍':['lust','mystic'],
+  '射手座':['hope','excited','raw'], '射手':['hope','excited'],
+  '摩羯座':['focused','melancholy'], '摩羯':['focused','melancholy'],
+  '水瓶座':['ethereal','curiosity'], '水瓶':['ethereal','curiosity'],
+  '雙魚座':['dreamy','sad','love'], '雙魚':['dreamy','sad','love'],
+  '火焰':['lust','rage'], '燃燒':['rage','lust'],
+  '流水':['calm','peaceful'], '大地':['focused','calm','warm'],
+  '樹':['peaceful','calm'], '樹木':['peaceful'], '森':['peaceful','mystic'],
+  '金屬':['focused','electric'],
+  '光明':['hope','warm'], '陰影':['mystic','fear'], '塵埃':['nostalgia','melancholy'],
+  '時間':['nostalgia','calm'], '空間':['cosmic','calm'],
+  '生命':['hope','warm'], '輪迴':['cosmic','grief'], '命運':['awe','mystic'],
+  '機器':['focused','electric'], '賽博':['electric','mystic'],
+  '科技':['focused','electric'], '未來':['hope','electric'],
+  '過去':['nostalgia'], '記憶':['nostalgia','melancholy'], '回憶':['nostalgia'],
+  '青春':['hope','joy'], '童年':['nostalgia','playful'],
+  '歲月':['nostalgia','melancholy'],
+  '音樂':['dreamy','euphoric'], '旋律':['dreamy','calm'],
+  '節奏':['excited'], '鼓':['raw','excited'], '鋼琴':['melancholy','tender'],
+  '吉他':['warm','raw'], '小提琴':['melancholy','tender'],
+  '搖滾':['rage','raw','euphoric'], '電音':['electric','euphoric'],
+  '跳舞':['joy','euphoric'],
+  '酒':['euphoric','warm'], '茶':['calm','peaceful'], '咖啡':['focused','warm'],
+  '蜂蜜':['warm','tender'], '巧克力':['warm','love'], '糖':['joy','warm'],
+  '心臟':['lust','raw'], '眼睛':['focused'], '頭髮':['tender'],
+  '骨':['focused','grief'], '血':['rage','lust'], '血液':['rage','lust'],
+  '神':['awe','mystic'], '佛':['peaceful','awe'], '天使':['ethereal','hope'],
+  '惡魔':['rage','mystic','fear'], '魔鬼':['rage','fear'], '鬼':['fear','mystic'],
+  '幽靈':['mystic','fear'], '亡靈':['grief','mystic'],
+  '仙':['ethereal','dreamy'], '仙女':['ethereal','dreamy'],
+  '妖':['mystic','lust'], '妖精':['mystic','playful'],
+  'love':['love'], 'lust':['lust'], 'desire':['lust','yearning'], 'horny':['lust'],
+  'sex':['lust'], 'sexy':['lust'], 'intimate':['love','lust'], 'passionate':['lust','euphoric'],
+  'happy':['joy'], 'joy':['joy'], 'ecstatic':['euphoric'], 'thrilled':['euphoric'],
+  'excited':['excited'], 'pumped':['excited'],
+  'sad':['sad'], 'lonely':['lonely'], 'depressed':['melancholy'], 'melancholy':['melancholy'],
+  'grief':['grief'], 'heartbroken':['grief'],
+  'angry':['anger'], 'mad':['anger'], 'furious':['rage'], 'rage':['rage'],
+  'jealous':['bitter'], 'bitter':['bitter'],
+  'scared':['fear'], 'afraid':['fear'], 'terrified':['horror'], 'nervous':['fear'],
+  'calm':['calm'], 'peaceful':['peaceful'], 'serene':['peaceful'], 'relaxed':['calm'],
+  'hopeful':['hope'], 'optimistic':['hope'], 'hope':['hope'],
+  'curious':['excited','playful'], 'amazed':['awe'], 'awe':['awe'], 'wonder':['awe'],
+  'dreamy':['dreamy'], 'mystical':['mystic'], 'mysterious':['mystic'],
+  'cosmic':['cosmic'], 'ethereal':['ethereal'],
+  'warm':['warm'], 'cold':['lonely','calm'], 'hot':['lust','warm'],
+  'tender':['tender'], 'soft':['tender','calm'],
+  'wild':['raw','rage'], 'chaos':['chaos'], 'chaotic':['chaos'],
+  'empty':['void'], 'numb':['void'],
+  'fire':['lust','warm','rage'], 'water':['calm'], 'ocean':['cosmic','calm'],
+  'sun':['warm','joy'], 'moon':['dreamy','melancholy'], 'star':['cosmic','dreamy'], 'stars':['cosmic','dreamy'],
+  'night':['mystic'], 'day':['joy'],
+  'rain':['sad'], 'snow':['lonely','calm'], 'storm':['chaos','rage'],
+  'red':['lust','anger'], 'blue':['calm','sad'], 'green':['calm','bitter'],
+  'purple':['mystic','dreamy'], 'pink':['love','tender'], 'black':['mystic','void'], 'white':['ethereal'],
+  'dragon':['awe','mystic'], 'phoenix':['rage','hope'], 'unicorn':['dreamy','ethereal'],
+  'cat':['mystic','playful'], 'dog':['joy','warm'], 'tiger':['rage','raw'], 'lion':['focused','warm'],
+  'wolf':['lonely','raw'], 'bear':['warm','focused'], 'fox':['mystic','playful'],
+  'shark':['focused','fear'], 'whale':['awe','cosmic'], 'dolphin':['joy','playful'],
+  'butterfly':['dreamy','tender'], 'bee':['excited','focused'], 'firefly':['dreamy','mystic'],
+  'spider':['fear','mystic'], 'snake':['mystic','fear'], 'lizard':['focused','mystic'],
+  'owl':['mystic','focused'], 'eagle':['focused','raw','hope'], 'crow':['mystic','lonely'],
+  'aries':['rage','hope'], 'taurus':['focused','warm'], 'gemini':['playful','chaos'],
+  'cancer':['tender','melancholy'], 'leo':['euphoric','warm'], 'virgo':['focused','calm'],
+  'libra':['peaceful','ethereal'], 'scorpio':['lust','mystic'], 'sagittarius':['hope','excited'],
+  'capricorn':['focused','melancholy'], 'aquarius':['ethereal','curiosity'], 'pisces':['dreamy','sad','love'],
+};
+
+// Single-character hints: caught when no word matches the character.
+const CHARS = {
+  '火':['lust','warm'], '熱':['warm','lust'], '燒':['lust','rage'], '炎':['warm','rage'],
+  '燙':['warm'], '焰':['rage','lust'], '暖':['warm'], '陽':['warm','joy'],
+  '水':['calm'], '冷':['calm','melancholy'], '寒':['lonely','melancholy'], '凍':['lonely'],
+  '涼':['calm','melancholy'], '霜':['lonely','calm'],
+  '光':['hope','warm'], '亮':['hope','warm'], '晴':['joy'], '閃':['electric'], '耀':['warm','euphoric'],
+  '輝':['warm','hope'],
+  '暗':['mystic','void'], '黑':['mystic','void'], '夜':['mystic'], '影':['mystic','melancholy'],
+  '冥':['mystic','grief'], '幽':['mystic','lonely'], '陰':['mystic','melancholy'],
+  '愛':['love'], '戀':['love'], '情':['love'], '心':['love','tender'],
+  '怒':['anger'], '恨':['bitter','anger'], '怨':['bitter','grief'],
+  '悲':['sad','grief'], '哀':['grief'], '苦':['bitter','grief'], '痛':['grief'],
+  '泣':['sad'], '淚':['sad'],
+  '喜':['joy'], '樂':['joy'], '歡':['joy'], '笑':['joy','playful'],
+  '懼':['fear'], '恐':['fear','horror'], '驚':['fear'], '慌':['fear','chaos'],
+  '欲':['lust'], '慕':['yearning','bitter'],
+  '夢':['dreamy'], '幻':['dreamy','mystic'], '魂':['ethereal','mystic'], '靈':['ethereal','mystic'],
+  '神':['awe','mystic'],
+  '深':['mystic','grief'], '沉':['grief','calm'], '重':['grief'],
+  '輕':['playful','calm'], '柔':['tender','calm'], '軟':['tender'],
+  '急':['chaos','electric'], '速':['electric','excited'], '快':['excited'],
+  '慢':['calm'], '緩':['calm'], '靜':['calm'], '寂':['lonely','calm'],
+  '狂':['rage','euphoric'], '烈':['rage','lust'], '猛':['rage','raw'],
+  '空':['void'], '虛':['void'], '無':['void','calm'],
+  '海':['calm','cosmic'], '山':['focused','peaceful'], '河':['calm'], '湖':['calm'],
+  '林':['peaceful','mystic'], '雲':['dreamy','calm'], '星':['cosmic','dreamy'], '月':['dreamy','melancholy'],
+  '日':['warm','hope'], '天':['peaceful','hope'], '風':['calm'], '雨':['sad'], '雪':['lonely','calm'],
+};
+
+// Hash fallback presets: when nothing matches, pick one of these.
+const HASH_PRESETS = ['dreamy','cosmic','ethereal','mystic','calm','awe','nostalgia','peaceful'];
+
+// Matcher: scan text, collect mood weights, blend top moods.
+function _strHash(s){
+  let h = 2166136261;
+  for(let i=0; i<s.length; i++){ h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; }
+  return h;
+}
+
+function _collectMoods(text){
+  const counts = {};
+  const lower = text.toLowerCase();
+  const covered = new Array(lower.length).fill(false);
+  // pass 1: longest-match word scan
+  const wordKeys = Object.keys(WORDS).sort((a,b)=> b.length - a.length);
+  for(const w of wordKeys){
+    let idx = 0;
+    while((idx = lower.indexOf(w, idx)) !== -1){
+      let anyUncovered = false;
+      for(let i=idx; i<idx+w.length; i++){ if(!covered[i]){ anyUncovered = true; break; } }
+      if(anyUncovered){
+        for(const m of WORDS[w]){ counts[m] = (counts[m]||0) + 1; }
+        for(let i=idx; i<idx+w.length; i++) covered[i] = true;
+      }
+      idx += w.length;
+    }
   }
-  // Fallback: Vercel / Netlify / Cloudflare function. Returns plain text.
-  const r = await fetch('/api/imagine', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt }),
-  });
-  if(!r.ok){
-    const txt = await r.text();
-    throw new Error('imagine API ' + r.status + ': ' + txt);
+  // pass 2: single-character hints for chars still uncovered
+  for(let i=0; i<lower.length; i++){
+    if(covered[i]) continue;
+    const ch = lower[i];
+    if(CHARS[ch]){
+      for(const m of CHARS[ch]){ counts[m] = (counts[m]||0) + 0.5; }
+    }
   }
-  const data = await r.json().catch(() => null);
-  if(data && typeof data.text === 'string') return data.text;
-  if(data && typeof data === 'string') return data;
-  // raw text fallback
-  return await r.text();
+  return counts;
+}
+
+function localImagine(text){
+  const counts = _collectMoods(text);
+  let moodList = Object.entries(counts).sort((a,b)=> b[1]-a[1]);
+  if(moodList.length === 0){
+    const h = _strHash(text || ' ');
+    const pick = HASH_PRESETS[h % HASH_PRESETS.length];
+    moodList = [[pick, 1]];
+  }
+  let top = moodList.slice(0, 3).filter(([m])=> MOOD_PRESETS[m]);
+  if(top.length === 0){
+    const h = _strHash(text || ' ');
+    top = [[HASH_PRESETS[h % HASH_PRESETS.length], 1]];
+  }
+  const totalW = top.reduce((s,[,w])=> s+w, 0);
+  const numKeys = ['temp','vibrance','hueShift','bgDark','bloom','trails','grain','vignette','density','motionSpeed','turbulence','glow','kaleido'];
+  const out = { values:{} };
+  for(const k of numKeys) out[k] = 0;
+  const modeSet = new Set(['base']);
+  let dominantPreset = null;
+  for(const [moodName, w] of top){
+    const p = MOOD_PRESETS[moodName];
+    if(!p) continue;
+    if(!dominantPreset) dominantPreset = p;
+    const wt = w / totalW;
+    for(const k of numKeys) out[k] += (p[k]||0) * wt;
+    for(const k in p.values){
+      out.values[k] = (out.values[k]||0) + p.values[k] * wt;
+    }
+    if(p.modes) for(const m of p.modes){
+      if(modeSet.size < 4) modeSet.add(m);
+    }
+  }
+  const klOpts = [0,4,6,8,12,16];
+  out.kaleido = klOpts.reduce((prev,cur)=> Math.abs(cur - out.kaleido) < Math.abs(prev - out.kaleido) ? cur : prev);
+  const modes = {};
+  for(const m of modeSet) modes[m] = true;
+  out.modes = modes;
+  out.poem = (dominantPreset && dominantPreset.poem) || '無聲的湧動';
+  return out;
 }
 
 async function imagine(text){
@@ -3449,41 +3797,12 @@ async function imagine(text){
   imagineBtn.textContent = '';
   imagineHint.textContent = 'reading the feeling\u2026';  imagineHint.classList.add('show');
 
-  const emoList = EMOTIONS.map(e=>`"${e.id}" (${e.name}: ${e.whisper})`).join(', ');
-  const prompt = `You are an emotion-to-visual translator. Read the user's text in any language and return a JSON object that captures its emotional weather as parameters for a generative visualization.
-
-User text: """${text}"""
-
-Available emotions (use these exact keys): ${emoList}
-
-Return ONLY valid JSON, no commentary. Schema (all fields optional):
-{
-  "values": { "emotionKey": 0..100, ... },  // 1-5 emotions that fit; weights 0-100
-  "temp": 0..100,                            // 0=stillness, 50=drift, 100=storm
-  "vibrance": 0..100,                        // 0=washed out, 100=hypersaturated
-  "hueShift": -180..180,                     // color rotation
-  "bgDark": 0..1,                            // 0=normal, 1=very dark
-  "bloom": 0..1,                             // glow halo
-  "trails": 0..1,                            // motion persistence
-  "grain": 0..1,
-  "vignette": 0..1,
-  "density": 0.2..2,
-  "motionSpeed": 0.1..3,
-  "turbulence": 0..2,
-  "glow": 0..1.5,
-  "kaleido": 0|4|6|8|12|16,                  // 0 = no kaleidoscope
-  "modes": { "base":true, "lineTrace":false, "flowField":false, "mandalaRings":false, "waveform":false, "constellation":false, "spiral":false },
-  "poem": "one short italic phrase (2-6 words) describing this mood, English ok"
-}
-
-Match the mood faithfully. Calm/sad moods -> low temp, low vibrance, low motion, maybe trails. Intense/angry -> high temp, high turbulence, sparks. Mystical/dreamy -> kaleido on, mandalaRings or constellation. Be expressive but coherent. Always include "base":true in modes.`;
+  // Local imagine — translate text to snapshot via dictionary, no AI, no env vars.
+  // Tiny delay so the spinner is visible even though we're synchronous.
+  await new Promise(r => setTimeout(r, 140));
 
   try {
-    const reply = await callClaude(prompt);
-    // extract first {...} block
-    const m = reply.match(/\{[\s\S]*\}/);
-    if(!m) throw new Error('no JSON in reply');
-    const snap = JSON.parse(m[0]);
+    const snap = localImagine(text);
     applySnapshot(snap);
     imagineHint.textContent = snap.poem ? `\u201c${snap.poem}\u201d` : 'composed.';
   } catch(err){
