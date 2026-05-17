@@ -1881,6 +1881,25 @@ document.addEventListener('click', (e) => {
   const tag = t && t.tagName;
   const id = (t && t.id) || (t && t.closest('[id]') && t.closest('[id]').id) || '(no id)';
   console.log('[IW] click @', tag, '· closest-id:', id, '· trusted:', e.isTrusted, '· phase: capture');
+
+  // Belt-and-suspenders FAB binding from inside the first script (we know this runs).
+  // Acts even if the second script's IIFE fails or the inline onclick is stripped.
+  if(t && t.closest){
+    if(t.closest('#fabRandom')){
+      console.log('[IW] capture-handler routing → fabRandom');
+      e.stopPropagation();
+      if(typeof randomizeAll === 'function') randomizeAll();
+      else console.warn('[IW] randomizeAll() not defined yet');
+      return;
+    }
+    if(t.closest('#fabPresent')){
+      console.log('[IW] capture-handler routing → fabPresent');
+      e.stopPropagation();
+      if(typeof window._fabPresent === 'function') window._fabPresent();
+      else console.warn('[IW] window._fabPresent() not exposed yet — second script may have failed');
+      return;
+    }
+  }
 }, true);
 
 const EMOTIONS = [
@@ -9541,8 +9560,8 @@ document.getElementById('kaleidoLink').addEventListener('change', e => {
 
 <!-- Floating bottom-right FABs: Random + Present -->
 <div class="floating-fab" id="floatingFab">
-  <button class="fab-btn" id="fabPresent" title="Presentation mode" aria-label="Present" onclick="window._fabPresent && window._fabPresent()">📺</button>
-  <button class="fab-btn primary" id="fabRandom" title="Randomize" aria-label="Random" onclick="window._fabRandom && window._fabRandom()">🎲</button>
+  <button class="fab-btn" id="fabPresent" title="Presentation mode" aria-label="Present" onclick="console.log('[IW] fabPresent inline onclick fired');if(typeof window._fabPresent==='function'){window._fabPresent();}else{console.error('[IW] window._fabPresent is',typeof window._fabPresent);}">📺</button>
+  <button class="fab-btn primary" id="fabRandom" title="Randomize" aria-label="Random" onclick="console.log('[IW] fabRandom inline onclick fired');if(typeof window._fabRandom==='function'){window._fabRandom();}else{console.error('[IW] window._fabRandom is',typeof window._fabRandom);}">🎲</button>
 </div>
 <script>
 /* —— Floating buttons + Presentation mode ——————————————————————— */
