@@ -2510,6 +2510,8 @@ class AudioReactor {
     this.bass = 0; this.mid = 0; this.treble = 0; this.vol = 0;
     this._smoothBass = 0;
     this._lastBeat = 0;
+    // AGC running peaks — slow decay so loud tracks get attenuated, quiet ones pass through
+    this._peakBass = 0.4; this._peakMid = 0.4; this._peakTreble = 0.4;
     this.mode = 'off';      // 'off' | 'mic' | 'file' | 'url'
     this.label = 'silent';
   }
@@ -2538,6 +2540,7 @@ class AudioReactor {
     }
     this.mode = 'off'; this.label = 'silent';
     this.bass = this.mid = this.treble = this.vol = 0;
+    this._peakBass = this._peakMid = this._peakTreble = 0.4;
   }
   async useMic(){
     this.ensureContext();
@@ -2575,18 +2578,31 @@ class AudioReactor {
     for(let i=1;i<bEnd;i++) bSum += this.freqBuf[i];
     for(let i=bEnd;i<mEnd;i++) mSum += this.freqBuf[i];
     for(let i=mEnd;i<tEnd;i++) tSum += this.freqBuf[i];
-    this.bass   = bSum / ((bEnd-1)*255);
-    this.mid    = mSum / ((mEnd-bEnd)*255);
-    this.treble = tSum / ((tEnd-mEnd)*255);
-    this.vol    = (this.bass*1.2 + this.mid + this.treble*0.8) / 3;
-    // bass-transient beat detection
+    const rawBass   = bSum / ((bEnd-1)*255);
+    const rawMid    = mSum / ((mEnd-bEnd)*255);
+    const rawTreble = tSum / ((tEnd-mEnd)*255);
+
+    // Beat detection on RAW bass (before AGC) so loud tracks still register transients
     const now = performance.now();
-    if(this.bass - this._smoothBass > 0.12 && this.bass > 0.18 && now - this._lastBeat > 160){
+    if(rawBass - this._smoothBass > 0.12 && rawBass > 0.18 && now - this._lastBeat > 160){
       this._lastBeat = now;
-      state.beatFlash = Math.min(1, state.beatFlash + 0.5 + this.bass*0.4);
+      state.beatFlash = Math.min(1, state.beatFlash + 0.5 + rawBass*0.4);
       if(beatDot){ beatDot.classList.add('on'); setTimeout(()=>beatDot.classList.remove('on'), 90); }
     }
-    this._smoothBass = this._smoothBass*0.82 + this.bass*0.18;
+    this._smoothBass = this._smoothBass*0.82 + rawBass*0.18;
+
+    // AGC: track slow-decaying peaks per band (~8s half-life), attenuate when peak > target.
+    // Never boosts quiet music — only tames loud/saturated tracks (Techno, Trance, mastered).
+    const decay = 0.9985;
+    this._peakBass   = Math.max(this._peakBass   * decay, rawBass);
+    this._peakMid    = Math.max(this._peakMid    * decay, rawMid);
+    this._peakTreble = Math.max(this._peakTreble * decay, rawTreble);
+    const target = 0.55, floor = 0.4;
+    const norm = p => p > target ? Math.max(floor, target / p) : 1.0;
+    this.bass   = rawBass   * norm(this._peakBass);
+    this.mid    = rawMid    * norm(this._peakMid);
+    this.treble = rawTreble * norm(this._peakTreble);
+    this.vol    = (this.bass*1.2 + this.mid + this.treble*0.8) / 3;
   }
 }
 
@@ -4019,11 +4035,13 @@ function randomizeAll(){
 
   // 8. Audio reactivity strengths — DO NOT change when music is loaded
   //    (so the user's uploaded track keeps driving visuals at the same sensitivity)
+  // Narrow range: gain*impact max ≈ 1.3*1.3 = 1.69 (was 2.1*2.2 = 4.6),
+  // so loud tracks (Techno/Trance) don't saturate. AGC in reactor handles the rest.
   if(reactor.mode === 'off'){
-    state.audioGain    = 0.4 + Math.random()*1.7;
-    state.bassImpact   = 0.4 + Math.random()*1.8;
-    state.midImpact    = 0.4 + Math.random()*1.8;
-    state.trebleImpact = 0.4 + Math.random()*1.8;
+    state.audioGain    = 0.6 + Math.random()*0.7;
+    state.bassImpact   = 0.6 + Math.random()*0.7;
+    state.midImpact    = 0.6 + Math.random()*0.7;
+    state.trebleImpact = 0.6 + Math.random()*0.7;
   }
 
   // 9. Image controls — randomize arrangement, effects, blend (NOT the uploaded images themselves)
