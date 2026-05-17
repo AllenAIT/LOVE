@@ -1577,6 +1577,10 @@
             <button class="audio-btn" id="lyricsToggle" style="flex:1">Sync off</button>
             <button class="audio-btn danger" id="lyricsClear" title="Clear loaded lyrics">✕ clear</button>
           </div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <button class="audio-btn" id="lyricsTest" style="flex:1" title="Force-display a test line on the canvas — proves lyric→canvas wiring works">🧪 Test display</button>
+            <button class="audio-btn" id="lyricsShowFirst" style="flex:1" title="Force-display the first lyric line">▶ Show line 1</button>
+          </div>
 
           <div class="ctrl"><span class="label">Fallback: switch every N lines</span><span class="val" id="lyricsEveryVal">5</span>
             <div class="slider"><div class="track"></div><div class="fill" id="lyricsEveryFill"></div><div class="thumb" id="lyricsEveryThumb"></div>
@@ -3835,6 +3839,37 @@ function _refreshLyricLine(){
   _applyLyricToTypo(lyrics.lines[idx].text);
 }
 window._refreshLyricLine = _refreshLyricLine;
+
+// ── DIAGNOSTIC helpers exposed on window for manual debugging in console ──
+//
+// To verify the "lyric → canvas" pipeline works at all, open Console (F12) and run:
+//   _testLyric('hello world')
+// If you see "hello world" appear on the canvas, the display chain works
+// and the problem is upstream (audio sync, file parsing).
+//
+// To dump the current lyric state:
+//   _lyricsStatus()
+window._testLyric = function(text){
+  text = text || 'TEST LYRIC · 歌詞測試 · 看到這個就是顯示鏈正常';
+  console.log('[IW] _testLyric:', text);
+  _applyLyricToTypo(text);
+  return 'spawned. Check the canvas — typography should now show: ' + text;
+};
+window._lyricsStatus = function(){
+  return {
+    enabled: lyrics.enabled,
+    lineCount: lyrics.lines.length,
+    currentIdx: lyrics.currentIdx,
+    firstLine: lyrics.lines[0] || null,
+    typoModeOn: state.modes.typography,
+    typoText: typo.text,
+    typoSpawns: typo.spawns.length,
+    typoAnim: typo.anim,
+    audioReady: typeof reactor !== 'undefined' && !!reactor.mediaEl,
+    audioPlaying: typeof reactor !== 'undefined' && reactor.mediaEl ? !reactor.mediaEl.paused : false,
+    audioTime: typeof reactor !== 'undefined' && reactor.mediaEl ? reactor.mediaEl.currentTime : null,
+  };
+};
 
 // Called from the main frame loop. Reads audio.currentTime from the reactor's
 // media element, finds the current line, fires section-transition + fallback
@@ -7758,6 +7793,21 @@ if(state.silentOutput){
       goBtn.textContent = playing ? '⏸ STOP' : '▶ GO  ·  start synced playback';
     }
   }
+  // Test buttons — force-display a line on canvas to verify the wiring
+  const testBtn = document.getElementById('lyricsTest');
+  const showFirstBtn = document.getElementById('lyricsShowFirst');
+  testBtn && testBtn.addEventListener('click', () => {
+    const t = '測試 TEST · 看到就 OK';
+    if(typeof _applyLyricToTypo === 'function') _applyLyricToTypo(t);
+    setStatus('test display fired — check the canvas');
+    console.log('[IW] manual test display:', t);
+  });
+  showFirstBtn && showFirstBtn.addEventListener('click', () => {
+    if(!lyrics.lines || !lyrics.lines.length){ setStatus('no lyrics loaded — upload .lrc or Fetch first'); return; }
+    if(typeof _applyLyricToTypo === 'function') _applyLyricToTypo(lyrics.lines[0].text);
+    setStatus('forced first line: ' + lyrics.lines[0].text);
+  });
+
   goBtn && goBtn.addEventListener('click', () => {
     if(!reactor || !reactor.mediaEl){ setStatus('upload a music file first'); return; }
     const el = reactor.mediaEl;
