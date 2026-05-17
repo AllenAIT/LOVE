@@ -3676,10 +3676,10 @@ const lyrics = {
   linesPerSwitchFallback: 5,
   instrumentalGapSec: 4,
   instrumentalSwitchSec: 2.5,
-  // LRC doesn't have end times — each line is shown until the next line's time
-  // OR for at most maxLineDurationSec (whichever comes first). This prevents the
-  // last line from hanging on screen during long instrumental gaps.
-  maxLineDurationSec: 5,
+  // LRC doesn't have end times — we estimate end = min(next.time, line.time + estimated).
+  // Estimate is based on character count (CJK chars sing slower than Latin), capped here.
+  // Prevents the line lingering during instrumental gaps.
+  maxLineDurationSec: 4,
   _lastGapSwitch: 0,
   _lineShowing: false,
   meta: null,             // { trackName, artistName }
@@ -3788,20 +3788,40 @@ function clearLyrics(){
 }
 
 // Clear any lyric currently displayed (for long instrumental gaps + end of song).
+// Immediate cut — wipes spawned words, center text, and typewriter state so the
+// screen goes blank as soon as the line is "done".
 function _clearLyricFromTypo(){
   if(typeof typo === 'undefined') return;
   typo.text = '';
   typo.centerCurrent = null;
+  typo._tw = null;
   if(Array.isArray(typo.spawns)) typo.spawns.length = 0;
+}
+
+// Estimate how long a lyric line should be shown given its text.
+// CJK chars sing slower than Latin chars; cap at lyrics.maxLineDurationSec.
+function _estimateLineDurationSec(text){
+  const s = (text || '').trim();
+  if(!s) return 0.5;
+  let cjk = 0, other = 0;
+  for(const ch of s){
+    const code = ch.charCodeAt(0);
+    // Hiragana+Katakana (U+3040-30FF), CJK ideographs (U+4E00-9FFF), Hangul syllables (U+AC00-D7AF)
+    if((code >= 0x3040 && code <= 0x30FF) || (code >= 0x4E00 && code <= 0x9FFF) || (code >= 0xAC00 && code <= 0xD7AF)) cjk++;
+    else if(code > 0x20) other++;
+  }
+  const est = 0.5 + cjk*0.30 + other*0.08;
+  return Math.max(0.8, Math.min(lyrics.maxLineDurationSec, est));
 }
 
 // Drive the existing Typography system with one lyric line.
 // Respects the user's Type tab choices (anim, style, color, weight, font, kaleido).
-// Disables auto-spawn so lines don't stack across timings.
-function _applyLyricToTypo(text){
+// `durationSec`, when given, tightens the spawned word's lifetime so it fades out
+// exactly when the line is "done" — no lingering past the next line.
+function _applyLyricToTypo(text, durationSec){
   if(typeof typo === 'undefined') return;
   text = (text || '').trim();
-  console.log('[IW] lyrics line:', text || '(empty)');
+  console.log('[IW] lyrics line:', text || '(empty)', durationSec != null ? `· ${durationSec.toFixed(2)}s` : '');
   if(!text){ return; }
   // Phrase pool = just this line (used by spawn-based anims)
   typo.text = text;
@@ -3818,7 +3838,14 @@ function _applyLyricToTypo(text){
   if(typeof spawnWord === 'function'){
     try {
       const burst = (typo.anim === 'popIn' || typo.anim === 'rain' || typo.layout === 'scatter') ? 3 : 1;
+      const before = typo.spawns.length;
       for(let i=0;i<burst;i++) spawnWord(text);
+      // Override word.life on the just-spawned word(s) so they vanish at line end.
+      if(durationSec != null && durationSec > 0){
+        for(let i=before;i<typo.spawns.length;i++){
+          typo.spawns[i].life = durationSec;
+        }
+      }
     } catch(err){ console.warn('[IW] spawnWord failed:', err); }
   }
   // Force typography mode on so the line is visible
@@ -3886,14 +3913,15 @@ function tickLyricsSync(){
     if(lyrics.lines[i].time <= t) idx = i; else break;
   }
 
-  // Clear stale line if we've stayed on the same line past its max duration.
-  // (LRC has no end times — we estimate end = min(next.time, line.time + maxDur).)
+  // Clear stale line if we've stayed on the same line past its estimated end.
+  // (LRC has no end times — we estimate end = min(next.time, line.time + est).)
   if(lyrics._lineShowing && lyrics.currentIdx >= 0){
     const cur = lyrics.lines[lyrics.currentIdx];
     const nxt = lyrics.lines[lyrics.currentIdx + 1];
+    const est = _estimateLineDurationSec(cur.text);
     const lineEnd = nxt
-      ? Math.min(nxt.time, cur.time + lyrics.maxLineDurationSec)
-      : cur.time + lyrics.maxLineDurationSec;
+      ? Math.min(nxt.time, cur.time + est)
+      : cur.time + est;
     if(t > lineEnd){
       _clearLyricFromTypo();
       lyrics._lineShowing = false;
@@ -3904,9 +3932,15 @@ function tickLyricsSync(){
     lyrics.currentIdx = idx;
     if(idx >= 0){
       const line = lyrics.lines[idx];
+      const nxt2 = lyrics.lines[idx + 1];
+      const est2 = _estimateLineDurationSec(line.text);
+      const displayFor = nxt2
+        ? Math.max(0.4, Math.min(nxt2.time - line.time, est2))
+        : est2;
       // Drive the Typography system with this line. User's Type-tab choices
       // (anim, style, color, weight, font) all apply.
-      _applyLyricToTypo(line.text);
+      // displayFor tightens spawn lifetime so the word fades at line end.
+      _applyLyricToTypo(line.text, displayFor);
       lyrics._lineShowing = true;
       // Section transition → trigger random
       if(line.section && line.section !== lyrics.currentSection){
