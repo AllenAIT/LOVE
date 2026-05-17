@@ -55,7 +55,8 @@ export default async function handler(req, res) {
 
 // —— Provider implementations ——
 
-// Groq — OpenAI-compatible API, free tier is fast. Llama 3.1 70B is great for SVG.
+// Groq — OpenAI-compatible API, free + fast. Llama 3.3 70B is the strongest available.
+// Lower temperature (0.55) gives coherent shapes; the prompt itself provides the variation.
 async function callGroq(prompt) {
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -65,9 +66,14 @@ async function callGroq(prompt) {
     },
     body: JSON.stringify({
       model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.9,
+      messages: [
+        { role: 'system', content: 'You output only valid JSON, no markdown, no explanation. Coordinates trace actual anatomy.' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.55,
+      top_p: 0.9,
       max_tokens: 1024,
+      response_format: { type: 'json_object' },
     }),
   });
   if (!r.ok) throw new Error(`Groq ${r.status}: ${await r.text()}`);

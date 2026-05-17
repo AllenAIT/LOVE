@@ -1,4 +1,15 @@
 <!doctype html>
+<!--
+  ════════════════════════════════════════════════════════════════════════════
+  Inner Weather — a field of feeling · v1
+  Copyright © 2026 Allen Hong. All rights reserved.
+
+  This source is proprietary. Unauthorised copying, distribution, modification,
+  reverse-engineering, or removal of watermarks/registration is prohibited.
+  Commercial licensing: ai.allen.task@gmail.com · IG @a.i.a.l.l.e.n
+  See LICENSE.md for full terms.
+  ════════════════════════════════════════════════════════════════════════════
+-->
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -147,6 +158,157 @@
   .rec-timer.on{display:inline-flex}
   .rec-timer .pip{width:7px;height:7px;border-radius:50%;background:#ff5070;animation:pulse 1.2s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+
+  /* Registration gate — full-screen until user enters name + email + profession */
+  .gate-overlay{
+    position:fixed; inset:0; z-index:9999;
+    background:radial-gradient(ellipse at center, rgba(20,20,32,.85) 0%, rgba(8,8,14,.97) 70%);
+    backdrop-filter:blur(28px); -webkit-backdrop-filter:blur(28px);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--sans);
+    animation: gateIn .6s ease-out;
+  }
+  .gate-overlay.hidden{ display:none; }
+  @keyframes gateIn{ from{opacity:0} to{opacity:1} }
+  .gate-card{
+    background:rgba(18,18,28,.72); border:1px solid rgba(255,255,255,.10);
+    border-radius:14px; padding:38px 36px; max-width:420px; width:88%;
+    backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px);
+    box-shadow:0 30px 80px rgba(0,0,0,.5);
+  }
+  .gate-title{
+    font-family:'Instrument Serif', serif; font-size:32px; font-style:italic;
+    color:var(--ink); margin:0 0 4px; letter-spacing:-.01em; line-height:1.1;
+  }
+  .gate-subtitle{
+    font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--ink-soft); margin-bottom:26px; opacity:.7;
+  }
+  .gate-field{ margin-bottom:14px; }
+  .gate-field label{
+    display:block; font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ink-soft); margin-bottom:6px; opacity:.75;
+  }
+  .gate-field input{
+    width:100%; box-sizing:border-box;
+    background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);
+    color:var(--ink); border-radius:8px; padding:10px 12px;
+    font-family:var(--sans); font-size:13px; outline:none;
+    transition: border-color .15s, background .15s;
+  }
+  .gate-field input:focus{ border-color:rgba(200,124,255,.6); background:rgba(255,255,255,.06); }
+  .gate-submit{
+    width:100%; margin-top:8px; padding:13px;
+    background:linear-gradient(135deg, #c87cff, #7fdcff);
+    border:none; border-radius:8px; color:#0e0c16;
+    font-family:var(--sans); font-size:11.5px; letter-spacing:.18em; text-transform:uppercase;
+    cursor:pointer; font-weight:600;
+    transition: transform .1s, box-shadow .2s, filter .15s;
+  }
+  .gate-submit:hover{ box-shadow:0 8px 24px rgba(200,124,255,.35); filter:brightness(1.05); }
+  .gate-submit:active{ transform:scale(.98); }
+  .gate-foot{
+    margin-top:18px; font-size:10.5px; color:var(--ink-faint);
+    font-style:italic; font-family:var(--serif); text-align:center; opacity:.7;
+  }
+
+  /* Author footer — always visible, bottom-right of viewport */
+  .author-foot{
+    position:fixed; right:18px; bottom:14px; z-index:5;
+    font-family:var(--sans); font-size:10px;
+    letter-spacing:.14em; text-transform:uppercase;
+    color:rgba(255,255,255,.32); pointer-events:auto;
+    display:flex; align-items:center; gap:8px;
+    background:rgba(0,0,0,.18); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    padding:5px 11px; border-radius:999px; border:1px solid rgba(255,255,255,.04);
+  }
+  .author-foot a{ color:rgba(255,255,255,.55); text-decoration:none; transition:color .15s; }
+  .author-foot a:hover{ color:#c87cff; }
+  .author-foot .sep{ opacity:.4; }
+
+  /* Blackout overlay — emergency fade-to-black for VJ transitions */
+  .blackout{
+    position:fixed; inset:0; z-index:8000;
+    background:#000; opacity:0; pointer-events:none;
+    transition: opacity .25s ease-out;
+  }
+  .blackout.on{ opacity:1; pointer-events:auto; }
+  .blackout.white{ background:#f5ede0; }
+
+  /* Tap tempo + LFO indicator badges */
+  .vj-hud{
+    position:fixed; left:18px; top:80px; z-index:6;
+    display:flex; flex-direction:column; gap:6px;
+    font-family:var(--sans); font-size:9.5px; letter-spacing:.14em;
+    text-transform:uppercase; color:rgba(255,255,255,.55);
+    pointer-events:none;
+  }
+  .vj-hud .badge{
+    background:rgba(0,0,0,.35); backdrop-filter:blur(8px);
+    padding:5px 10px; border-radius:999px;
+    border:1px solid rgba(255,255,255,.08);
+  }
+  .vj-hud .badge.flash{ animation: vjFlash .35s ease-out; }
+  @keyframes vjFlash{ 0%{background:rgba(200,124,255,.5)} 100%{background:rgba(0,0,0,.35)} }
+
+  /* Hotkey legend (shows on '?' key) */
+  .hotkey-help{
+    position:fixed; right:18px; top:80px; z-index:7;
+    background:rgba(8,8,14,.88); backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,.10); border-radius:10px;
+    padding:14px 18px; max-width:280px;
+    font-family:var(--sans); font-size:11px; color:rgba(255,255,255,.78);
+    display:none;
+  }
+  .hotkey-help.on{ display:block; }
+  .hotkey-help h4{ margin:0 0 8px; font-family:'Instrument Serif',serif; font-style:italic; font-size:15px; color:var(--ink); font-weight:400; }
+  .hotkey-help .row{ display:flex; justify-content:space-between; padding:3px 0; gap:14px; }
+  .hotkey-help kbd{
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12);
+    padding:2px 7px; border-radius:4px; font-family:var(--mono),monospace;
+    font-size:10px; color:#fff; letter-spacing:0;
+  }
+
+  /* MIDI bindings list */
+  .midi-status{
+    font-family:var(--sans); font-size:11px; color:var(--ink-soft);
+    padding:6px 10px; border-radius:7px;
+    background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);
+    margin-bottom:6px;
+  }
+  .midi-status.live{ color:#9bd3a7; border-color:rgba(155,211,167,.2); }
+  .midi-bindings{ display:flex; flex-direction:column; gap:3px; max-height:340px; overflow-y:auto; }
+  .midi-row{
+    display:grid; grid-template-columns: 1fr auto auto auto;
+    align-items:center; gap:6px;
+    padding:5px 8px; border-radius:6px;
+    background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.04);
+    font-family:var(--sans); font-size:11px;
+    transition: background .12s, border-color .12s;
+  }
+  .midi-row:hover{ background:rgba(255,255,255,.04); }
+  .midi-row.trigger{ background:rgba(200,124,255,.05); border-color:rgba(200,124,255,.10); }
+  .midi-row .midi-label{ color:var(--ink); font-size:11.5px; }
+  .midi-row .midi-cc{
+    font-family:var(--mono),monospace; font-size:9.5px;
+    color:var(--ink-soft); opacity:.7; min-width:70px; text-align:right;
+    letter-spacing:.04em;
+  }
+  .midi-row .midi-cc.bound{ color:#7fdcff; opacity:1; }
+  .midi-row button{
+    appearance:none; border:1px solid rgba(255,255,255,.08);
+    background:rgba(255,255,255,.04); color:var(--ink);
+    padding:3px 8px; border-radius:5px; cursor:pointer;
+    font-family:var(--sans); font-size:9.5px; letter-spacing:.1em;
+    text-transform:uppercase;
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  .midi-row button:hover{ background:rgba(255,255,255,.10); }
+  .midi-row button.learning{
+    background:rgba(255,200,40,.18); border-color:rgba(255,200,40,.55);
+    color:#ffd89e; animation: midiLearnPulse 1.1s ease-in-out infinite;
+  }
+  @keyframes midiLearnPulse{ 50%{ background:rgba(255,200,40,.30); } }
 
   /* Phrase library chips */
   .phrase-lib{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
@@ -528,8 +690,77 @@
 </style>
 </head>
 <body>
+  <!-- Registration gate — blocks everything until user submits name + email + profession.
+       Skipped automatically for projection windows (?silent=1) since the human already
+       registered on the operator window of the same browser (shared localStorage). -->
+  <div class="gate-overlay" id="gateOverlay">
+    <div class="gate-card">
+      <div class="gate-title">Inner Weather</div>
+      <div class="gate-subtitle">register to enter · 註冊以進入</div>
+      <form id="gateForm" autocomplete="off">
+        <div class="gate-field">
+          <label for="gateName">Name · 姓名</label>
+          <input id="gateName" type="text" required maxlength="80" />
+        </div>
+        <div class="gate-field">
+          <label for="gateEmail">Email</label>
+          <input id="gateEmail" type="email" required maxlength="120" />
+        </div>
+        <div class="gate-field">
+          <label for="gateRole">Profession · 職業</label>
+          <input id="gateRole" type="text" required maxlength="80" />
+        </div>
+        <button class="gate-submit" type="submit">Enter the field</button>
+      </form>
+      <div class="gate-foot">
+        your info stays on this device — nothing leaves your browser.<br>
+        <span style="opacity:.85">saved images &amp; recorded videos carry a "© Allen Hong" watermark.<br>
+        for a watermark-free license, contact <a href="mailto:ai.allen.task@gmail.com" style="color:#c87cff;text-decoration:none">ai.allen.task@gmail.com</a></span>
+      </div>
+    </div>
+  </div>
+
   <div id="stage">
     <canvas id="cv"></canvas>
+  </div>
+
+  <!-- Author footer — © Allen Hong + IG link -->
+  <div class="author-foot">
+    <span>© Allen Hong</span>
+    <span class="sep">·</span>
+    <a href="https://instagram.com/a.i.a.l.l.e.n" target="_blank" rel="noopener noreferrer" title="Instagram">@a.i.a.l.l.e.n</a>
+    <span class="sep">·</span>
+    <a href="#" id="hotkeyToggleBtn" title="Show keyboard shortcuts (press ?)">?</a>
+  </div>
+
+  <!-- Emergency blackout overlay (Space key) -->
+  <div class="blackout" id="blackoutOverlay"></div>
+
+  <!-- VJ live HUD — tap tempo + LFO indicators -->
+  <div class="vj-hud" id="vjHud">
+    <div class="badge" id="vjTap" style="display:none">TAP <span id="vjTapBpm">--</span> BPM</div>
+    <div class="badge" id="vjLfo" style="display:none">LFO <span id="vjLfoTarget">vibrance</span></div>
+    <div class="badge" id="vjAB"  style="display:none">SLOT A · <span id="vjABStatus">ready</span></div>
+  </div>
+
+  <!-- Hotkey legend (press ? to toggle) -->
+  <div class="hotkey-help" id="hotkeyHelp">
+    <h4>Keyboard shortcuts</h4>
+    <div class="row"><span>Blackout</span><kbd>Space</kbd></div>
+    <div class="row"><span>Whiteout</span><kbd>Shift+Space</kbd></div>
+    <div class="row"><span>Random composition</span><kbd>R</kbd></div>
+    <div class="row"><span>Reset to defaults</span><kbd>X</kbd></div>
+    <div class="row"><span>Tap tempo (4 taps)</span><kbd>T</kbd></div>
+    <div class="row"><span>Toggle LFO</span><kbd>L</kbd></div>
+    <div class="row"><span>Save slot A</span><kbd>Q</kbd></div>
+    <div class="row"><span>Save slot B</span><kbd>W</kbd></div>
+    <div class="row"><span>Recall A</span><kbd>A</kbd></div>
+    <div class="row"><span>Recall B</span><kbd>S</kbd></div>
+    <div class="row"><span>Crossfade A↔B</span><kbd>D</kbd></div>
+    <div class="row"><span>Mute audio output</span><kbd>M</kbd></div>
+    <div class="row"><span>Fullscreen</span><kbd>F</kbd></div>
+    <div class="row"><span>Toggle panel</span><kbd>P</kbd></div>
+    <div class="row"><span>Toggle this help</span><kbd>?</kbd></div>
   </div>
 
   <div class="topbar">
@@ -957,6 +1188,7 @@
             <button class="audio-btn danger grow" id="audioStop">Stop</button>
             <input type="file" id="audioFileInput" accept="audio/*" style="display:none" />
           </div>
+          <label class="mode-chip" style="margin-top:8px"><input type="checkbox" id="silentOutput" /><span><strong>Silent output 靜音 ·  投影專用</strong><em>visuals still react, but no sound through speakers (use <code>?silent=1</code> in URL for the projection window)</em></span></label>
           <div class="audio-note" id="audioNote">YouTube audio can't be tapped directly — paste a link to embed the player, then enable <strong>Mic</strong> to let the field react to it.</div>
           <div class="audio-levels" id="audioLevels" style="opacity:.4">
             <div class="lvl"><div class="name">Bass</div><div class="bar"><div class="fill" id="lvlBass"></div></div></div>
@@ -987,6 +1219,18 @@
               <input type="range" min="0" max="250" value="100" id="tImp" />
             </div>
           </div>
+        </div>
+
+        <div class="section">
+          <h3 class="section-title">MIDI controller <em style="font-size:11px;color:var(--ink-faint);font-style:normal;letter-spacing:.12em;text-transform:uppercase;margin-left:6px">CC + notes</em></h3>
+          <div id="midiStatus" class="midi-status">checking for MIDI…</div>
+          <div style="display:flex;gap:6px;margin:6px 0 10px;flex-wrap:wrap">
+            <button class="audio-btn" id="midiEnableBtn">Enable MIDI</button>
+            <button class="audio-btn" id="midiPanic" title="Stop all learn modes">Cancel learn</button>
+            <button class="audio-btn" id="midiClearAll" title="Remove all bindings">Clear all</button>
+          </div>
+          <div id="midiBindings" class="midi-bindings"></div>
+          <div class="type-tip" style="margin-top:8px">click <strong>Learn</strong> next to a parameter, then move a knob / press a pad on your controller. binding is captured + saved automatically.</div>
         </div>
       </section>
 
@@ -1365,6 +1609,12 @@ const state = {
   },
   // inverse palette — white canvas, dark content. CSS filter (invert + hue-rotate) preserves hue.
   lightMode: false,
+  // silent audio output — for projection windows. Visuals still react, no speaker sound.
+  // Auto-enabled when ?silent=1 is in the URL.
+  silentOutput: (new URLSearchParams(location.search)).has('silent'),
+  // license — true skips all watermarks (set by /api/license-check after gate)
+  noWatermark: false,
+  licenseInfo: null,
   // line-art sketch — AI-generated SVG paths drawn as a top layer (Picasso-style glyph)
   sketch: {
     enabled: false,
@@ -1943,7 +2193,34 @@ function frame(now){
   // uploaded image draws on main canvas, on top of everything (own effects only)
   if(window._drawImageTop) window._drawImageTop(ctx, dt);
 
+  // Watermark — only burned into the canvas while recording (so it appears in the video).
+  // Skipped for licensed users (whitelisted via /api/license-check).
+  if(window._isRecording && window._isRecording() && !state.noWatermark){
+    drawRecordingWatermark(ctx);
+  }
+
   requestAnimationFrame(frame);
+}
+
+// Burn © Allen Hong watermark onto the canvas during recording.
+function drawRecordingWatermark(g){
+  const dpr = state.pixelRatio || 1;
+  const pad = 18 * dpr;
+  const baseFontSize = Math.max(11, Math.min(W, H) * 0.014);
+  g.save();
+  g.font = `${baseFontSize}px "Inter Tight", -apple-system, sans-serif`;
+  g.textBaseline = 'middle';
+  g.textAlign = 'right';
+  // soft dark plate behind text for legibility on any bg
+  const text = '© Allen Hong  ·  @a.i.a.l.l.e.n  ·  Inner Weather';
+  const tw = g.measureText(text).width;
+  const plateH = baseFontSize * 1.8;
+  g.fillStyle = 'rgba(0,0,0,0.42)';
+  g.fillRect(W - tw - pad*2, H - plateH - pad*0.6, tw + pad*1.4, plateH);
+  // text
+  g.fillStyle = 'rgba(243,238,230,0.92)';
+  g.fillText(text, W - pad, H - plateH/2 - pad*0.6);
+  g.restore();
 }
 
 // wrapper so drawPairs (uses `ctx`) routes to passed context via temp rebinding-free approach
@@ -2176,6 +2453,14 @@ document.getElementById('save').addEventListener('click', ()=>{
   o.fillStyle = 'rgba(243,238,230,.55)';
   const ts = new Date().toISOString().slice(0,16).replace('T',' · ');
   o.fillText(`temp ${state.temp|0}°  ·  ${ts}`, pad, h - 16*state.pixelRatio);
+  // © watermark — bottom right of caption strip. Skipped for licensed users.
+  if(!state.noWatermark){
+    o.textAlign = 'right';
+    o.fillStyle = 'rgba(243,238,230,.65)';
+    o.font = `${11*state.pixelRatio}px "Inter Tight", sans-serif`;
+    o.fillText('© Allen Hong  ·  @a.i.a.l.l.e.n  ·  Inner Weather', w - pad, h - 16*state.pixelRatio);
+    o.textAlign = 'left';
+  }
   const url = out.toDataURL('image/png');
   const a = document.createElement('a');
   a.href = url; a.download = `inner-weather-${Date.now()}.png`; a.click();
@@ -2773,9 +3058,22 @@ class AudioReactor {
     audioEl.crossOrigin = 'anonymous';
     this.source = this.ac.createMediaElementSource(audioEl);
     this.source.connect(this.analyser);
-    this.analyser.connect(this.ac.destination);
+    // Silent mode: skip speaker output. Analyser still gets FFT data for visuals.
+    // Used by projection windows so only the operator window plays sound.
+    if(!state.silentOutput){
+      this.analyser.connect(this.ac.destination);
+    }
     audioEl.play().catch(e=>console.warn('audio play failed', e));
     this.mode = 'media'; this.label = labelText || 'playing';
+  }
+  setSilent(silent){
+    if(!this.ac || !this.analyser) return;
+    try {
+      this.analyser.disconnect(this.ac.destination);
+    } catch(e){}
+    if(!silent){
+      try { this.analyser.connect(this.ac.destination); } catch(e){}
+    }
   }
   update(){
     if(!this.analyser || this.mode === 'off') return;
@@ -5888,6 +6186,102 @@ document.querySelectorAll('.lock-chip').forEach(chip => {
   });
 });
 
+// Registration gate — first-visit gate. Stored in localStorage, persists across sessions.
+// On submit, calls /api/license-check to see if this email is on the whitelist;
+// if yes, sets state.noWatermark so saves/recordings come out clean.
+// Projection windows (?silent=1) automatically skip since the operator already registered
+// in the same browser (shared localStorage).
+const GATE_KEY = 'iw-user-v1';
+const LICENSE_KEY = 'iw-license-v1';
+
+async function checkLicense(email){
+  try {
+    const r = await fetch('/api/license-check', {
+      method:'POST',
+      headers:{ 'content-type':'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    if(!r.ok) return null;
+    return await r.json();
+  } catch(_){ return null; }
+}
+
+function applyLicense(lic){
+  if(lic && lic.licensed){
+    state.noWatermark = true;
+    state.licenseInfo = { email: lic.email, name: lic.name, admin: !!lic.admin, expires: lic.expires };
+    try { localStorage.setItem(LICENSE_KEY, JSON.stringify(lic)); } catch(_){}
+  } else {
+    state.noWatermark = false;
+    state.licenseInfo = null;
+  }
+}
+
+(function setupGate(){
+  const overlay = document.getElementById('gateOverlay');
+  const form = document.getElementById('gateForm');
+  if(!overlay || !form) return;
+
+  function getRegisteredUser(){
+    try {
+      const u = JSON.parse(localStorage.getItem(GATE_KEY) || 'null');
+      if(u && u.name && u.email && u.role) return u;
+    } catch(_){}
+    return null;
+  }
+
+  // Bypass for projection windows
+  const isProjection = new URLSearchParams(location.search).has('silent');
+  const existing = getRegisteredUser();
+  if(isProjection || existing){
+    overlay.classList.add('hidden');
+    // Cached license check — apply stored license immediately, then refresh from server.
+    if(existing){
+      try {
+        const cached = JSON.parse(localStorage.getItem(LICENSE_KEY) || 'null');
+        if(cached && cached.expires && cached.expires > Date.now()) applyLicense(cached);
+      } catch(_){}
+      // Re-check in background — admin might have updated the whitelist.
+      checkLicense(existing.email).then(lic => { if(lic) applyLicense(lic); });
+    }
+  } else {
+    setTimeout(() => document.getElementById('gateName').focus(), 200);
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name  = document.getElementById('gateName').value.trim();
+    const email = document.getElementById('gateEmail').value.trim();
+    const role  = document.getElementById('gateRole').value.trim();
+    if(!name || !email || !role) return;
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return;
+    try {
+      localStorage.setItem(GATE_KEY, JSON.stringify({
+        name, email, role, registeredAt: Date.now(),
+      }));
+    } catch(_){}
+    // Hit the license API; outcome decides watermark.
+    const lic = await checkLicense(email);
+    if(lic) applyLicense(lic);
+    overlay.classList.add('hidden');
+  });
+})();
+
+// Silent audio output — wire toggle + sync from URL param
+const silentOutputCb = document.getElementById('silentOutput');
+if(silentOutputCb){
+  silentOutputCb.checked = !!state.silentOutput;
+  silentOutputCb.addEventListener('change', () => {
+    state.silentOutput = silentOutputCb.checked;
+    if(typeof reactor !== 'undefined') reactor.setSilent(state.silentOutput);
+  });
+}
+// If ?silent=1 was in the URL, make it obvious in the page title so the operator
+// can tell at a glance which window is the projection one.
+if(state.silentOutput){
+  document.title = '🔇 ' + document.title + ' · projection';
+}
+
 // Light mode — paper canvas (drawBackground + bgClearColor paint cream natively now).
 // We DON'T use a CSS invert filter anymore — that was a full-screen GPU pass per frame
 // and was the actual cause of lag in light mode. Body bg follows so the page chrome matches.
@@ -6011,6 +6405,8 @@ function stopRecording(){
   clearInterval(recTickId);
 }
 recBtn.addEventListener('click', () => recorder ? stopRecording() : startRecording());
+// expose recording state for the watermark renderer in frame()
+window._isRecording = () => !!recorder;
 
 /* —————————————————————————————————————————————————————————————————————
    Camera + MediaPipe (lazy-loaded)
@@ -8039,37 +8435,53 @@ async function generateSketch(prompt, opts){
   const moods = ['calm','playful','majestic','melancholy','curious','sleepy','alert','tender'];
   const variationHint = `Variation seed #${_sketchSeed}. Draw with this fresh angle: ${poses[_sketchSeed % poses.length]}, feeling ${moods[(_sketchSeed*3) % moods.length]}.`;
 
-  const sysPrompt = `You are a master of continuous-line drawing (一筆畫 / one-line art / Picasso ligne claire).
-Draw "${prompt}" as a single continuous flowing line.
+  const sysPrompt = `Task: output ONE JSON object that draws "${prompt}" as a Picasso-style continuous-line sketch.
 ${variationHint}
 
-Output ONLY valid JSON, no markdown, no prose:
-{
-  "paths": ["M ... C ... C ...", ...],
-  "anim": "pulse" | "breathe" | "drift" | "static",
-  "viewBox": [0, 0, 200, 200]
-}
+Output format (no markdown, no prose, JSON only):
+{"paths":["M ... C ... C ..."],"anim":"breathe","viewBox":[0,0,200,200]}
 
-CRITICAL style rules — match a Picasso single-line sketch:
-- Prefer ONE path, drawn from start to end without lifting the pen. Use 2 paths only when truly needed (e.g. an eye dot).
-- The path should be made of C (cubic Bezier) curves, NOT straight lines. Organic, flowing, calligraphic.
-- The line should overlap itself, loop, double back — this is how single-line drawings suggest 3D form.
-- viewBox is 0 0 200 200 with the subject centered around (100, 100). Use the full canvas.
-- DO NOT close the path with Z. Let it end where it ends — that's part of the aesthetic.
-- DO NOT add fills. This is pure line.
-- Keep the curve count between 8 and 25 — enough to suggest the form, not so many it gets fussy.
+Hard rules — your output will be rejected if you violate these:
+1. Canvas is exactly 0 0 200 200. The subject MUST fit inside x=20..180, y=20..180. Center is (100, 100).
+2. Use ONE SVG path. Two only if an eye dot is needed.
+3. Path commands allowed: M (move) and C (cubic bezier). NO L, NO Q, NO Z, NO A.
+4. Use 10–22 C segments. Each C uses 6 numbers: control1_x control1_y control2_x control2_y end_x end_y.
+5. Coordinates must be integers between 20 and 180. Never go outside.
+6. The path must look like the subject — actually trace its outline. Mental check: would a human see "${prompt}" in this?
+7. Pick anim: "pulse" (heart/brain/lung), "breathe" (animals/plants), "drift" (fish/wind/water/clouds), "static" (objects).
 
-Animation hint (pick one):
-- pulse   — body parts that beat (heart, brain, lung)
-- breathe — animals, plants, organic things at rest
-- drift   — water, fish, wind, clouds, leaves
-- static  — geometric objects, architecture
+Few-shot examples (study the shape — coordinates trace actual anatomy):
 
-Example for "cat" (one continuous path):
-{"paths":["M 60 110 C 55 80 75 65 100 70 C 115 55 135 60 140 80 C 155 78 162 95 152 110 C 160 130 145 145 120 142 C 115 150 95 152 85 140 C 65 142 50 130 60 110 M 92 102 C 92 100 96 100 96 102 C 96 104 92 104 92 102"],"anim":"breathe","viewBox":[0,0,200,200]}
+Cat: {"paths":["M 60 115 C 55 85 72 65 100 72 C 118 55 138 60 142 82 C 158 80 165 98 152 112 C 162 132 145 148 120 144 C 114 152 92 154 84 140 C 64 142 50 130 60 115 M 90 103 C 90 101 95 101 95 103 C 95 105 90 105 90 103"],"anim":"breathe","viewBox":[0,0,200,200]}
 
-Now draw "${prompt}". Output JSON only.`;
-  try {
+Elephant: {"paths":["M 60 75 C 50 55 80 40 100 50 C 118 40 145 50 150 70 C 170 70 175 95 160 105 C 168 115 152 125 138 118 C 140 130 125 138 115 130 C 110 145 95 150 88 135 C 90 150 85 165 75 165 C 60 168 55 150 65 135 C 70 120 78 105 78 95 C 70 100 60 105 55 115 C 48 130 50 158 42 168 C 32 165 35 145 45 125 C 55 105 55 85 60 75"],"anim":"breathe","viewBox":[0,0,200,200]}
+
+Bird: {"paths":["M 35 100 C 55 78 80 85 100 95 C 108 75 125 70 138 78 C 152 70 168 80 165 95 C 175 95 175 110 160 112 C 145 118 130 108 120 105 C 115 115 100 122 88 115 C 70 118 50 112 35 100"],"anim":"drift","viewBox":[0,0,200,200]}
+
+Now produce the JSON for "${prompt}". Output ONLY the JSON, nothing else.`;
+  // Validate output coherence — small LLMs sometimes emit gibberish coordinates.
+  // Score = bbox coverage × segment count × spread. Re-try once if score is bad.
+  function scorePaths(paths){
+    if(!Array.isArray(paths) || !paths.length) return 0;
+    let minX=999, minY=999, maxX=-999, maxY=-999, segs=0;
+    for(const d of paths){
+      const nums = (d.match(/-?\d+(\.\d+)?/g) || []).map(Number);
+      segs += Math.floor(nums.length / 2);
+      for(let i=0; i<nums.length; i+=2){
+        const x = nums[i], y = nums[i+1];
+        if(x>=0 && x<=200 && y>=0 && y<=200){
+          minX=Math.min(minX,x); minY=Math.min(minY,y);
+          maxX=Math.max(maxX,x); maxY=Math.max(maxY,y);
+        }
+      }
+    }
+    const bw = maxX-minX, bh = maxY-minY;
+    if(bw < 40 || bh < 40) return 0;       // too cramped
+    if(segs < 8) return 0;                  // too simple
+    return (bw + bh) / 360 * Math.min(1, segs/12);
+  }
+
+  async function attempt(){
     const r = await fetch('/api/imagine', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -8078,10 +8490,20 @@ Now draw "${prompt}". Output JSON only.`;
     if(!r.ok) throw new Error('api ' + r.status);
     const data = await r.json();
     let txt = (data.text || '').trim();
-    // strip code fences if Claude added them despite the rule
     txt = txt.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
-    const obj = JSON.parse(txt);
+    return JSON.parse(txt);
+  }
+
+  try {
+    let obj = await attempt();
     if(!obj || !Array.isArray(obj.paths) || !obj.paths.length) throw new Error('no paths');
+    // Re-roll once if the drawing scored poorly (gibberish, too cramped, too simple)
+    if(scorePaths(obj.paths) < 0.4){
+      if(hint) hint.textContent = 'refining…';
+      try { const retry = await attempt();
+        if(retry && Array.isArray(retry.paths) && scorePaths(retry.paths) > scorePaths(obj.paths)) obj = retry;
+      } catch(_){}
+    }
     Object.assign(state.sketch, {
       enabled: true, prompt,
       paths: obj.paths,
@@ -8285,6 +8707,503 @@ setTimeout(() => { const h = document.getElementById('h'); if(h) h.classList.add
   document.getElementById('fabPresent').addEventListener('click', () => {
     if(presentWin && !presentWin.closed) closePresent(); else openPresent();
   });
+})();
+
+/* ════════════════════════════════════════════════════════════════════════════
+   VJ live controls — keyboard shortcuts, blackout, tap-tempo, A/B slots, LFO.
+   All inert when the user is typing in an input/textarea.
+   ════════════════════════════════════════════════════════════════════════════ */
+(function vjControls(){
+  const blackoutEl = document.getElementById('blackoutOverlay');
+  const helpEl = document.getElementById('hotkeyHelp');
+  const tapBadge = document.getElementById('vjTap');
+  const tapBpmText = document.getElementById('vjTapBpm');
+  const lfoBadge = document.getElementById('vjLfo');
+  const lfoTargetText = document.getElementById('vjLfoTarget');
+  const abBadge = document.getElementById('vjAB');
+  const abStatus = document.getElementById('vjABStatus');
+
+  // ——— Tap tempo ———
+  const taps = [];
+  function tapTempo(){
+    const now = performance.now();
+    // drop taps older than 2s — assume new song / new tempo
+    while(taps.length && now - taps[0] > 2000) taps.shift();
+    taps.push(now);
+    if(taps.length >= 2){
+      const intervals = [];
+      for(let i=1;i<taps.length;i++) intervals.push(taps[i]-taps[i-1]);
+      const avg = intervals.reduce((a,b)=>a+b,0)/intervals.length;
+      const bpm = Math.round(60000/avg);
+      if(bpm >= 40 && bpm <= 200){
+        state.bpm = bpm;
+        const bpmInput = document.getElementById('bpm');
+        if(bpmInput){ bpmInput.value = bpm; bpmInput.dispatchEvent(new Event('input')); }
+        tapBpmText.textContent = bpm;
+      }
+    } else {
+      tapBpmText.textContent = '…';
+    }
+    tapBadge.style.display = 'block';
+    tapBadge.classList.remove('flash'); void tapBadge.offsetWidth; tapBadge.classList.add('flash');
+  }
+
+  // ——— A/B slot system + crossfade ———
+  // Two slot snapshots of the full state; D key blends linearly from current → other.
+  const slots = { a: null, b: null };
+  function snapshotForSlot(){
+    return {
+      values: { ...state.values }, temp: state.temp,
+      vibrance: state.vibrance, hueShift: state.hueShift,
+      bgDark: state.bgDark, bloom: state.bloom, trails: state.trails,
+      grain: state.grain, vignette: state.vignette,
+      density: state.density, motionSpeed: state.motionSpeed,
+      turbulence: state.turbulence, glow: state.glow,
+      kaleido: state.kaleido, mirror: state.mirror, lightMode: state.lightMode,
+      modes: { ...state.modes },
+    };
+  }
+  function applySlot(snap){
+    if(!snap) return;
+    if(snap.values){ for(const k in snap.values) state.values[k] = snap.values[k]; for(const e of EMOTIONS) updateRow(e.id); }
+    if(snap.temp != null){ state.temp = snap.temp; updateTemp(); }
+    const setSlider = (id, mul) => {
+      const el = document.getElementById(id);
+      if(el){ el.value = Math.round((snap[id === 'aGain' ? 'audioGain' : id] || 0) * mul); }
+    };
+    ['vibrance','hueShift','bgDark','bloom','trails','grain','vignette','density','motionSpeed','turbulence','glow','kaleido','mirror','lightMode'].forEach(k => {
+      if(snap[k] != null) state[k] = snap[k];
+    });
+    if(snap.modes){
+      const keepW = state.modes.webcamFX, keepT = state.modes.typography;
+      for(const k in snap.modes) if(k in state.modes) state.modes[k] = !!snap.modes[k];
+      state.modes.webcamFX = keepW; state.modes.typography = keepT;
+      document.querySelectorAll('#modes input').forEach(cb => cb.checked = !!state.modes[cb.dataset.mode]);
+    }
+    if(typeof applyLightMode === 'function') applyLightMode();
+    if(typeof syncAllUI === 'function') syncAllUI();
+  }
+  function showAB(text){
+    abBadge.style.display = 'block';
+    abStatus.textContent = text;
+  }
+
+  // Crossfade animation — interpolate numeric fields from current → target over ~1.2s.
+  let xfade = null;
+  function startCrossfade(targetSlot){
+    if(!slots[targetSlot]){ showAB(`slot ${targetSlot.toUpperCase()} empty`); return; }
+    const from = snapshotForSlot();
+    const to = slots[targetSlot];
+    xfade = { from, to, t0: performance.now(), dur: 1200, target: targetSlot };
+    showAB(`crossfading → ${targetSlot.toUpperCase()}`);
+  }
+  function tickCrossfade(){
+    if(!xfade) return;
+    const u = Math.min(1, (performance.now() - xfade.t0) / xfade.dur);
+    const ease = u < 0.5 ? 2*u*u : 1 - Math.pow(-2*u+2, 2)/2;
+    const lerp = (a, b) => a + (b - a) * ease;
+    // emotions
+    for(const k in xfade.from.values){
+      state.values[k] = lerp(xfade.from.values[k] || 0, xfade.to.values[k] || 0);
+    }
+    for(const e of EMOTIONS) updateRow(e.id);
+    state.temp = lerp(xfade.from.temp, xfade.to.temp); updateTemp();
+    for(const k of ['vibrance','hueShift','bgDark','bloom','trails','grain','vignette','density','motionSpeed','turbulence','glow']){
+      if(xfade.from[k] != null && xfade.to[k] != null) state[k] = lerp(xfade.from[k], xfade.to[k]);
+    }
+    if(u >= 1){
+      // snap modes + light mode at the end (not interpolatable)
+      applySlot(xfade.to);
+      showAB(`slot ${xfade.target.toUpperCase()} live`);
+      xfade = null;
+    } else {
+      requestAnimationFrame(tickCrossfade);
+    }
+  }
+
+  // ——— LFO modulator ———
+  // Cycles through targets, modulates the chosen one slowly. Adds organic motion
+  // without user touching anything.
+  const lfo = {
+    on: false,
+    target: 'vibrance',
+    targets: ['vibrance','hueShift','glow','turbulence','bgDark','bloom'],
+    targetIdx: 0,
+    baseValue: 0,
+    speed: 0.08,   // cycles per second
+    depth: 0.35,   // 35% modulation range
+    t0: 0,
+  };
+  function lfoNextTarget(){
+    lfo.targetIdx = (lfo.targetIdx + 1) % lfo.targets.length;
+    lfo.target = lfo.targets[lfo.targetIdx];
+    lfo.baseValue = state[lfo.target] || 0;
+    lfoTargetText.textContent = lfo.target;
+  }
+  function lfoToggle(){
+    lfo.on = !lfo.on;
+    if(lfo.on){
+      lfo.t0 = performance.now();
+      lfo.baseValue = state[lfo.target] || 0;
+      lfoBadge.style.display = 'block';
+      lfoTargetText.textContent = lfo.target;
+    } else {
+      // restore base
+      state[lfo.target] = lfo.baseValue;
+      if(typeof syncAllUI === 'function') syncAllUI();
+      lfoBadge.style.display = 'none';
+    }
+  }
+  function tickLfo(){
+    if(!lfo.on){ requestAnimationFrame(tickLfo); return; }
+    const t = (performance.now() - lfo.t0) / 1000;
+    const wave = Math.sin(t * Math.PI * 2 * lfo.speed);  // -1..1
+    const base = lfo.baseValue;
+    let range;
+    if(lfo.target === 'hueShift') range = 180;     // -180..180 absolute
+    else if(lfo.target === 'vibrance') range = 50;  // 0..100
+    else range = 0.6;                                // 0..~1 fields
+    state[lfo.target] = lfo.target === 'hueShift'
+      ? base + wave * range * lfo.depth
+      : Math.max(0, base + wave * range * lfo.depth);
+    requestAnimationFrame(tickLfo);
+  }
+  tickLfo();
+
+  // ——— Hotkey help toggle ———
+  function toggleHelp(){ helpEl.classList.toggle('on'); }
+  const helpBtn = document.getElementById('hotkeyToggleBtn');
+  if(helpBtn) helpBtn.addEventListener('click', (e) => { e.preventDefault(); toggleHelp(); });
+
+  // ——— Blackout / whiteout ———
+  function setBlackout(on, white){
+    if(white) blackoutEl.classList.add('white'); else blackoutEl.classList.remove('white');
+    blackoutEl.classList.toggle('on', on);
+  }
+  let blackoutOn = false;
+
+  // ——— Main key handler ———
+  function isTyping(e){
+    const tgt = e.target;
+    if(!tgt) return false;
+    const tag = (tgt.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || tgt.isContentEditable;
+  }
+  document.addEventListener('keydown', (e) => {
+    if(isTyping(e)) return;
+    if(e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    switch(k){
+      case ' ':
+        e.preventDefault();
+        blackoutOn = !blackoutOn;
+        setBlackout(blackoutOn, e.shiftKey);
+        break;
+      case 'r':
+        if(typeof randomizeAll === 'function') randomizeAll();
+        break;
+      case 'x': {
+        const r = document.getElementById('reset'); if(r) r.click();
+        break;
+      }
+      case 't':
+        tapTempo();
+        break;
+      case 'l':
+        lfoToggle();
+        break;
+      case 'q':
+        slots.a = snapshotForSlot(); showAB('saved → A');
+        break;
+      case 'w':
+        slots.b = snapshotForSlot(); showAB('saved → B');
+        break;
+      case 'a':
+        if(slots.a){ applySlot(slots.a); showAB('recalled A'); } else showAB('A empty');
+        break;
+      case 's':
+        if(slots.b){ applySlot(slots.b); showAB('recalled B'); } else showAB('B empty');
+        break;
+      case 'd':
+        // crossfade to the slot NOT matching current dominant state — toggle target
+        startCrossfade((xfade && xfade.target === 'a') ? 'b' : (slots.b ? 'b' : 'a'));
+        if(xfade) tickCrossfade();
+        break;
+      case 'm': {
+        const cb = document.getElementById('silentOutput');
+        if(cb){ cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); }
+        break;
+      }
+      case 'f':
+        if(document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+        break;
+      case 'p': {
+        const panelEl = document.getElementById('panel');
+        if(panelEl) panelEl.classList.toggle('closed');
+        const fab = document.getElementById('fab');
+        if(fab) fab.classList.toggle('hidden', !panelEl.classList.contains('closed'));
+        break;
+      }
+      case '?':
+      case '/':
+        toggleHelp();
+        break;
+      case 'n':
+        // Cycle LFO target (only when LFO is on)
+        if(lfo.on){ lfoNextTarget(); }
+        break;
+    }
+  });
+})();
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MIDI controller input — Web MIDI API.
+   Learn-mode flow: click Learn next to a param, move a knob → binding saved.
+   Supports CC for continuous params + Note On for trigger actions.
+   Bindings persist in localStorage.
+   ════════════════════════════════════════════════════════════════════════════ */
+(function midiSetup(){
+  const MIDI_KEY = 'iw-midi-bindings-v1';
+
+  // ——— Bindable parameters ———
+  // For each: how to read current state value (for soft-takeover hints later),
+  // how to write back, and matching slider id for live UI update.
+  const MIDI_PARAMS = [
+    { id:'vibrance',     label:'Vibrance',       slider:'vib',    range:[0,100],    apply:v => { state.vibrance = Math.round(v); } },
+    { id:'hueShift',     label:'Hue shift',      slider:'hue',    range:[-180,180], apply:v => { state.hueShift = Math.round(v); } },
+    { id:'bgDark',       label:'Bg darkness',    slider:'dark',   range:[0,1],      apply:v => { state.bgDark = v; }, mul:100 },
+    { id:'bloom',        label:'Bloom',          slider:'bloom',  range:[0,1],      apply:v => { state.bloom = v; }, mul:100 },
+    { id:'trails',       label:'Trails',         slider:'trail',  range:[0,0.95],   apply:v => { state.trails = v; }, mul:100 },
+    { id:'grain',        label:'Grain',          slider:'grain',  range:[0,1],      apply:v => { state.grain = v; }, mul:100 },
+    { id:'vignette',     label:'Vignette',       slider:'vig',    range:[0,1],      apply:v => { state.vignette = v; }, mul:100 },
+    { id:'density',      label:'Density',        slider:'dens',   range:[0,2],      apply:v => { state.density = v; }, mul:100 },
+    { id:'motionSpeed',  label:'Motion speed',   slider:'mot',    range:[0,3],      apply:v => { state.motionSpeed = v; }, mul:100 },
+    { id:'turbulence',   label:'Turbulence',     slider:'turb',   range:[0,2],      apply:v => { state.turbulence = v; }, mul:100 },
+    { id:'glow',         label:'Glow',           slider:'glow',   range:[0,2],      apply:v => { state.glow = v; }, mul:100 },
+    { id:'audioGain',    label:'Audio gain',     slider:'aGain',  range:[0,3],      apply:v => { state.audioGain = v; }, mul:100 },
+    { id:'bassImpact',   label:'Bass impact',    slider:'bImp',   range:[0,2.5],    apply:v => { state.bassImpact = v; }, mul:100 },
+    { id:'midImpact',    label:'Mid impact',     slider:'mImp',   range:[0,2.5],    apply:v => { state.midImpact = v; }, mul:100 },
+    { id:'trebleImpact', label:'Treble impact',  slider:'tImp',   range:[0,2.5],    apply:v => { state.trebleImpact = v; }, mul:100 },
+  ];
+
+  // ——— Trigger actions (mapped to Note On) ———
+  const MIDI_TRIGGERS = [
+    { id:'random',    label:'Random',         fn:()=> typeof randomizeAll==='function' && randomizeAll() },
+    { id:'reset',     label:'Reset',          fn:()=> { const r=document.getElementById('reset'); if(r) r.click(); } },
+    { id:'blackout',  label:'Blackout',       fn:()=> { const el=document.getElementById('blackoutOverlay'); if(el) el.classList.toggle('on'); } },
+    { id:'recallA',   label:'Recall A',       fn:()=> _dispatchKey('a') },
+    { id:'recallB',   label:'Recall B',       fn:()=> _dispatchKey('s') },
+    { id:'crossfade', label:'Crossfade A↔B',  fn:()=> _dispatchKey('d') },
+    { id:'tap',       label:'Tap tempo',      fn:()=> _dispatchKey('t') },
+    { id:'lfoToggle', label:'LFO on/off',     fn:()=> _dispatchKey('l') },
+  ];
+  // helper — let MIDI triggers reuse the existing keydown handlers (defined in vjControls IIFE above)
+  function _dispatchKey(k){
+    document.dispatchEvent(new KeyboardEvent('keydown', { key:k, bubbles:true }));
+  }
+
+  // ——— State ———
+  const midi = {
+    access: null,
+    inputs: [],
+    bindings: {},     // key "ch0-cc23" → { param: 'vibrance', kind: 'cc' } or { trigger: 'random', kind: 'note' }
+    learning: null,   // { id, isTrigger } when learn-clicked
+    enabled: false,
+  };
+
+  function saveBindings(){
+    try { localStorage.setItem(MIDI_KEY, JSON.stringify(midi.bindings)); } catch(_){}
+  }
+  function loadBindings(){
+    try {
+      const raw = JSON.parse(localStorage.getItem(MIDI_KEY) || 'null');
+      if(raw && typeof raw === 'object') midi.bindings = raw;
+    } catch(_){}
+  }
+  loadBindings();
+
+  // ——— Apply a value to a param (used by both MIDI receive AND learning peek) ———
+  function applyParam(paramId, value01){
+    const p = MIDI_PARAMS.find(x => x.id === paramId);
+    if(!p) return;
+    const [a, b] = p.range;
+    const v = a + (b - a) * value01;
+    p.apply(v);
+    // mirror into the slider so the UI moves
+    if(p.slider){
+      const el = document.getElementById(p.slider);
+      if(el){
+        el.value = Math.round(v * (p.mul || 1));
+        el.dispatchEvent(new Event('input', { bubbles:true }));
+      }
+    }
+  }
+
+  function fireTrigger(triggerId){
+    const t = MIDI_TRIGGERS.find(x => x.id === triggerId);
+    if(t) t.fn();
+  }
+
+  // ——— Incoming MIDI dispatcher ———
+  function handleMessage(e){
+    const [status, d1, d2] = e.data;
+    const cmd = status & 0xF0;
+    const ch  = status & 0x0F;
+    let key, value01, isNote = false;
+    if(cmd === 0xB0){              // Control Change
+      key = `ch${ch}-cc${d1}`;
+      value01 = d2 / 127;
+    } else if(cmd === 0x90 && d2 > 0){   // Note On (with velocity > 0)
+      key = `ch${ch}-note${d1}`;
+      value01 = 1;
+      isNote = true;
+    } else {
+      return;
+    }
+
+    // Learning mode: bind this key to the awaiting target
+    if(midi.learning){
+      midi.bindings[key] = midi.learning.isTrigger
+        ? { trigger: midi.learning.id, kind: isNote ? 'note' : 'cc' }
+        : { param:   midi.learning.id, kind: isNote ? 'note' : 'cc' };
+      midi.learning = null;
+      saveBindings();
+      renderUI();
+      return;
+    }
+
+    const b = midi.bindings[key];
+    if(!b) return;
+    if(b.param)   applyParam(b.param, value01);
+    if(b.trigger) fireTrigger(b.trigger);
+  }
+
+  // ——— Init / refresh ———
+  async function enable(){
+    if(!navigator.requestMIDIAccess){
+      setStatus('Web MIDI not supported in this browser. Try Chrome/Edge.', false);
+      return;
+    }
+    try {
+      midi.access = await navigator.requestMIDIAccess({ sysex:false });
+      midi.enabled = true;
+      midi.access.onstatechange = refreshInputs;
+      refreshInputs();
+    } catch(err){
+      setStatus('MIDI permission denied: ' + (err.message || err), false);
+    }
+  }
+  function refreshInputs(){
+    if(!midi.access) return;
+    midi.inputs = Array.from(midi.access.inputs.values());
+    for(const input of midi.inputs){
+      input.onmidimessage = handleMessage;
+    }
+    if(midi.inputs.length === 0){
+      setStatus('MIDI enabled · no controllers connected — plug one in', true);
+    } else {
+      const names = midi.inputs.map(i => i.name || 'unnamed').join(', ');
+      setStatus(`MIDI live · ${names}`, true);
+    }
+  }
+
+  // ——— UI render ———
+  const statusEl = document.getElementById('midiStatus');
+  const listEl   = document.getElementById('midiBindings');
+  function setStatus(text, live){
+    if(!statusEl) return;
+    statusEl.textContent = text;
+    statusEl.classList.toggle('live', !!live);
+  }
+  function reverseLookup(targetId, isTrigger){
+    for(const key in midi.bindings){
+      const b = midi.bindings[key];
+      if(isTrigger && b.trigger === targetId) return key;
+      if(!isTrigger && b.param === targetId) return key;
+    }
+    return null;
+  }
+  function formatKey(k){
+    // "ch0-cc23" → "ch 1 · CC 23"; "ch0-note36" → "ch 1 · Note 36"
+    const m = k.match(/^ch(\d+)-(cc|note)(\d+)$/);
+    if(!m) return k;
+    return `ch ${(+m[1])+1} · ${m[2]==='cc' ? 'CC' : 'Note'} ${m[3]}`;
+  }
+  function renderUI(){
+    if(!listEl) return;
+    listEl.innerHTML = '';
+    // Params section
+    const heading1 = document.createElement('div');
+    heading1.style.cssText = 'font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);opacity:.55;margin:6px 0 2px;padding:0 4px';
+    heading1.textContent = 'Continuous (CC)';
+    listEl.appendChild(heading1);
+    for(const p of MIDI_PARAMS){
+      listEl.appendChild(renderRow(p.id, p.label, false));
+    }
+    // Triggers section
+    const heading2 = document.createElement('div');
+    heading2.style.cssText = 'font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);opacity:.55;margin:10px 0 2px;padding:0 4px';
+    heading2.textContent = 'Triggers (Note)';
+    listEl.appendChild(heading2);
+    for(const t of MIDI_TRIGGERS){
+      listEl.appendChild(renderRow(t.id, t.label, true));
+    }
+  }
+  function renderRow(id, label, isTrigger){
+    const row = document.createElement('div');
+    row.className = 'midi-row' + (isTrigger ? ' trigger' : '');
+    const learning = midi.learning && midi.learning.id === id && midi.learning.isTrigger === isTrigger;
+    const boundKey = reverseLookup(id, isTrigger);
+    row.innerHTML = `
+      <span class="midi-label">${label}</span>
+      <span class="midi-cc ${boundKey ? 'bound':''}">${boundKey ? formatKey(boundKey) : '—'}</span>
+      <button class="midi-learn ${learning ? 'learning':''}">${learning ? 'listening…' : 'Learn'}</button>
+      <button class="midi-clear" ${boundKey ? '' : 'disabled'} title="Remove binding">✕</button>
+    `;
+    row.querySelector('.midi-learn').addEventListener('click', () => {
+      if(!midi.enabled){ enable().then(() => startLearn(id, isTrigger)); return; }
+      startLearn(id, isTrigger);
+    });
+    row.querySelector('.midi-clear').addEventListener('click', () => {
+      if(!boundKey) return;
+      delete midi.bindings[boundKey];
+      saveBindings();
+      renderUI();
+    });
+    return row;
+  }
+  function startLearn(id, isTrigger){
+    midi.learning = { id, isTrigger };
+    renderUI();
+    // auto-cancel after 8 seconds if nothing received
+    setTimeout(() => {
+      if(midi.learning && midi.learning.id === id){
+        midi.learning = null; renderUI();
+      }
+    }, 8000);
+  }
+
+  // ——— Wire buttons ———
+  const enableBtn = document.getElementById('midiEnableBtn');
+  if(enableBtn) enableBtn.addEventListener('click', enable);
+  const panicBtn = document.getElementById('midiPanic');
+  if(panicBtn) panicBtn.addEventListener('click', () => { midi.learning = null; renderUI(); });
+  const clearBtn = document.getElementById('midiClearAll');
+  if(clearBtn) clearBtn.addEventListener('click', () => {
+    if(!confirm('Remove all MIDI bindings?')) return;
+    midi.bindings = {};
+    saveBindings();
+    renderUI();
+  });
+
+  // Initial render + auto-enable if browser supports it (no permission needed for MIDI access without sysex on most browsers)
+  renderUI();
+  if(navigator.requestMIDIAccess){
+    enable();
+  } else {
+    setStatus('Web MIDI not supported in this browser. Try Chrome/Edge.', false);
+  }
 })();
 </script>
 

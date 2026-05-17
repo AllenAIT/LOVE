@@ -1,0 +1,21 @@
+# Build artefacts
+dist/
+node_modules/
+
+# Local env (NEVER commit API keys)
+.env
+.env.local
+.env*.local
+
+# Vercel CLI scratch
+.vercel/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Sketch / scratch HTML
+*.tmp.html
+old/scratch/
