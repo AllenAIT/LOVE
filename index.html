@@ -9645,17 +9645,32 @@ setTimeout(() => { const h = document.getElementById('h'); if(h) h.classList.add
     if(presentWin && !presentWin.closed){ try{ presentWin.close(); }catch(_){} }
   }
 
+  console.log('[IW] FAB IIFE booted — delegation registered');
+
   // Robust document delegation — survives obfuscation + IIFE order + late DOM updates.
+  // Call randomizeAll() directly instead of going through button.click() to avoid
+  // capture-phase interceptors swallowing the synthetic event.
   document.addEventListener('click', (e) => {
     const t = e.target;
     if(!t || !t.closest) return;
     if(t.closest('#fabRandom')){
-      const btn = $('randomize');
-      if(btn) btn.click();
+      console.log('[IW] fabRandom clicked');
+      if(typeof randomizeAll === 'function'){
+        randomizeAll();
+      } else {
+        const btn = $('randomize');
+        if(btn) btn.click();
+        else console.warn('[IW] randomizeAll missing AND #randomize button missing');
+      }
       return;
     }
     if(t.closest('#fabPresent')){
-      if(presentWin && !presentWin.closed) closePresent(); else openPresent();
+      console.log('[IW] fabPresent clicked, presentWin:', presentWin);
+      try {
+        if(presentWin && !presentWin.closed) closePresent(); else openPresent();
+      } catch(err){
+        console.error('[IW] present failed:', err);
+      }
       return;
     }
   });
