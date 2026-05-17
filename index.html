@@ -592,14 +592,17 @@
       </button>
     </div>
 
-    <!-- Lock chips — locked groups are preserved across RANDOM -->
+    <!-- Lock chips — one per tab. Locked groups are preserved across RANDOM. -->
     <div class="lockbar">
       <span class="lockbar-lbl">Lock</span>
-      <button class="lock-chip" data-lock="style"  title="Keep visual modes & kaleido"><span class="ico">🔓</span>Style</button>
-      <button class="lock-chip" data-lock="color"  title="Keep vibrance, hue, bloom"><span class="ico">🔓</span>Color</button>
-      <button class="lock-chip" data-lock="motion" title="Keep speed, density, glow"><span class="ico">🔓</span>Motion</button>
-      <button class="lock-chip" data-lock="audio"  title="Keep audio gain & impacts"><span class="ico">🔓</span>Audio</button>
-      <button class="lock-chip" data-lock="mirror" title="Keep mirror & kaleido symmetry"><span class="ico">🔓</span>Mirror</button>
+      <button class="lock-chip" data-lock="feelings" title="Feelings tab — emotions & temperature"><span class="ico">🔓</span>Feelings</button>
+      <button class="lock-chip" data-lock="field"    title="Field tab — density, motion, turbulence, glow"><span class="ico">🔓</span>Field</button>
+      <button class="lock-chip" data-lock="visual"   title="Visual tab — color, atmosphere, mirror, kaleido, light mode"><span class="ico">🔓</span>Visual</button>
+      <button class="lock-chip" data-lock="style"    title="Modes — visual style picks (Pop Art / Matrix / etc.)"><span class="ico">🔓</span>Style</button>
+      <button class="lock-chip" data-lock="audio"    title="Audio tab — gain & per-band impacts"><span class="ico">🔓</span>Audio</button>
+      <button class="lock-chip" data-lock="image"    title="Image tab — arrangement & aesthetics"><span class="ico">🔓</span>Image</button>
+      <button class="lock-chip" data-lock="type"     title="Type tab — typography animation, color, weight"><span class="ico">🔓</span>Type</button>
+      <button class="lock-chip" data-lock="live"     title="Live tab — camera fx, background removal"><span class="ico">🔓</span>Live</button>
     </div>
 
     <nav class="tabs" id="tabs">
@@ -1333,7 +1336,17 @@ const state = {
     typography:   false,   // text-as-VJ visual (driven by Live tab)
   },
   // randomize lock groups — locked = RANDOM keeps that group's values
-  locks: { style:false, color:false, motion:false, audio:false, mirror:false },
+  // tab-aligned: each lock matches a tab in the side panel
+  locks: {
+    feelings: false,  // Feelings tab — emotions + temp
+    field:    false,  // Field tab — density, motion, turbulence, glow
+    visual:   false,  // Visual tab — vibrance, hue, bgDark, bloom, trails, grain, vignette, mirror, kaleido, lightMode
+    style:    false,  // Modes — state.modes selection (Pop Art / Matrix / etc.)
+    audio:    false,  // Audio tab — gain + impacts
+    image:    false,  // Image tab — arrangement + aesthetics
+    type:     false,  // Type tab — typography animation, color, weight
+    live:     false,  // Live tab — camera fx, background removal
+  },
   // inverse palette — white canvas, dark content. CSS filter (invert + hue-rotate) preserves hue.
   lightMode: false,
   // auto-cycle modes based on music sections
@@ -1652,6 +1665,11 @@ class Field {
 
 
 // ---- background ----
+// Color used to "clear" the canvas — paper-tone in light mode, near-black otherwise.
+// All code that wants a true canvas reset should use this, not '#05050a' directly.
+function bgClearColor(){
+  return state.lightMode ? '#f5ede0' : '#05050a';
+}
 function drawBackground(g, time, T){
   let total=0, hueSum=0, lightSum=0;
   for(const e of EMOTIONS){
@@ -1663,6 +1681,18 @@ function drawBackground(g, time, T){
   }
   const h = total>0 ? hueSum/total : 240;
   const l = total>0 ? lightSum/total : 30;
+  if(state.lightMode){
+    // Paper / rice-paper bg — warm cream center, slightly darker edges
+    const grd = g.createRadialGradient(CX, CY, 0, CX, CY, Math.max(W,H)*0.85);
+    grd.addColorStop(0,   `hsl(${(h+30)%360}, 18%, ${94 - state.bgDark*8}%)`);
+    grd.addColorStop(0.7, `hsl(${(h+45)%360}, 14%, ${88 - state.bgDark*10}%)`);
+    grd.addColorStop(1,   `hsl(${(h+60)%360}, 12%, ${82 - state.bgDark*12}%)`);
+    g.fillStyle = grd; g.fillRect(0,0,W,H);
+    // very subtle warm haze (replaces the dark-mode black overlay)
+    g.fillStyle = `rgba(180,160,130,${0.04 + state.bgDark*0.08})`;
+    g.fillRect(0,0,W,H);
+    return;
+  }
   // bgDark: 0 -> normal, 1 -> deeply darkened (clamps lightness toward black)
   const darkMul = 1 - (state.bgDark || 0) * 0.85;
   const grd = g.createRadialGradient(CX, CY, 0, CX, CY, Math.max(W,H)*0.8);
@@ -1696,9 +1726,9 @@ function compositeToMain(){
     ctx.filter = 'none';
     ctx.restore();
   } else {
-    // black canvas then mirrored wedges
+    // canvas reset then mirrored wedges — paper tone in lightMode
     ctx.save();
-    ctx.fillStyle = '#05050a';
+    ctx.fillStyle = bgClearColor();
     ctx.fillRect(0, 0, W, H);
     ctx.filter = filterStr;
     ctx.translate(CX, CY);
@@ -1816,7 +1846,9 @@ function frame(now){
   if(state.trails > 0.02){
     g.save();
     g.globalCompositeOperation = 'source-over';
-    g.fillStyle = `rgba(5,5,10,${(1 - state.trails) * 0.6})`;
+    g.fillStyle = state.lightMode
+      ? `rgba(245,237,224,${(1 - state.trails) * 0.6})`
+      : `rgba(5,5,10,${(1 - state.trails) * 0.6})`;
     g.fillRect(0,0,W,H);
     g.restore();
   } else {
@@ -3939,18 +3971,13 @@ function drawMatrix(g, dt, T){
       const alpha = (1 - k/col.trail) * (0.85 + (reactor.vol||0)*0.2);
       const seed = Math.floor((cy*0.12 + state.t*0.005 + col.x*0.04 + k*1.7));
       const ch = _matrixChars[((seed % _matrixChars.length) + _matrixChars.length) % _matrixChars.length];
-      if(k===0){
-        g.fillStyle = `rgba(220,255,225,${alpha})`;
-        g.shadowColor = 'rgba(120,255,150,0.85)';
-        g.shadowBlur = 12 * SCALE;
-      } else {
-        g.fillStyle = `rgba(50,230,110,${alpha*0.55})`;
-        g.shadowBlur = 0;
-      }
+      // No shadowBlur — it kills perf. Head char is just brighter/whiter instead.
+      g.fillStyle = (k === 0)
+        ? `rgba(230,255,230,${alpha})`
+        : (k < 3) ? `rgba(130,255,170,${alpha*0.85})` : `rgba(50,210,100,${alpha*0.55})`;
       g.fillText(ch, col.x, cy);
     }
   }
-  g.shadowBlur = 0;
   g.restore();
 }
 
@@ -4116,7 +4143,7 @@ function applySnapshot(snap, opts){
     // reseed fields
     for(const f of fields){ f.blobs.length=0; f.particles.length=0; f.init(); }
     // also clear offscreen canvas to kill any trails
-    srcCtx.fillStyle = '#05050a'; srcCtx.fillRect(0,0,W,H);
+    srcCtx.fillStyle = bgClearColor(); srcCtx.fillRect(0,0,W,H);
   }
 
   if(snap.values){
@@ -4665,12 +4692,22 @@ function updatePerf(dt){
     } else if(perf.avgFps > 52 && perf.quality < 1.0){
       perf.quality = Math.min(1.0, perf.quality + 0.06);
     }
+    // Bigger hammer: drop pixelRatio when fps is really bad. Halves every render cost.
+    // Recovers when fps comes back. Only triggers if device started above 1.0.
+    if(perf.avgFps < 28 && state.pixelRatio > 1.0){
+      state.pixelRatio = 1.0;
+      perf.showLow = true; perf.lastShow = now;
+      if(typeof resize === 'function') resize();
+    } else if(perf.avgFps > 55 && state.pixelRatio < perf.maxPixelRatio){
+      state.pixelRatio = perf.maxPixelRatio;
+      if(typeof resize === 'function') resize();
+    }
   }
   // show 'optimizing' label briefly
   if(perf.showLow && now - perf.lastShow < 2200){
     perfBadge.classList.add('show');
     perfBadge.textContent = `optimizing — ${Math.round(perf.avgFps)} fps`;
-  } else if(perf.quality < 0.75){
+  } else if(perf.quality < 0.75 || state.pixelRatio < perf.maxPixelRatio){
     perfBadge.classList.add('show');
     perfBadge.textContent = `eco mode · ${Math.round(perf.quality*100)}%`;
   } else {
@@ -4698,19 +4735,48 @@ function randomizeAll(){
   const hot = intensity, cool = 1 - intensity;
 
   // 2. Reset all visual artifacts
-  for(const e of EMOTIONS) state.values[e.id] = 0;
-  // Snapshot for lock preservation — locked groups get restored after the random roll.
+  // Snapshot ALL groups before reset — locked groups get restored at the end.
+  // Locks are tab-aligned: feelings/field/visual/style/audio/image/type/live.
   const L = state.locks;
   const snap = {
-    modes: { ...state.modes },
-    kaleido: state.kaleido, mirror: state.mirror,
+    // Feelings
+    values: { ...state.values }, temp: state.temp,
+    // Field
+    density: state.density, motionSpeed: state.motionSpeed,
+    turbulence: state.turbulence, glow: state.glow,
+    // Visual (includes mirror/kaleido + lightMode — all "look" controls)
     vibrance: state.vibrance, hueShift: state.hueShift, bgDark: state.bgDark,
     bloom: state.bloom, trails: state.trails, grain: state.grain, vignette: state.vignette,
-    density: state.density, motionSpeed: state.motionSpeed, turbulence: state.turbulence, glow: state.glow,
-    audioGain: state.audioGain, bassImpact: state.bassImpact, midImpact: state.midImpact, trebleImpact: state.trebleImpact,
+    kaleido: state.kaleido, mirror: state.mirror, lightMode: state.lightMode,
+    // Style — visual mode picks
+    modes: { ...state.modes },
+    // Audio
+    audioGain: state.audioGain, bassImpact: state.bassImpact,
+    midImpact: state.midImpact, trebleImpact: state.trebleImpact,
+    // Image
+    img: imgState ? {
+      arrangement: imgState.arrangement, count: imgState.count, spawnRate: imgState.spawnRate,
+      opacity: imgState.opacity, effectStrength: imgState.effectStrength, scale: imgState.scale,
+      blend: imgState.blend, useAllImages: imgState.useAllImages, cycle: imgState.cycle,
+      modes: imgState.modes ? { ...imgState.modes } : null,
+    } : null,
+    // Type
+    typo: (typeof typo !== 'undefined') ? {
+      anim: typo.anim, style: typo.style, color: typo.color, weight: typo.weight,
+      outlineWidth: typo.outlineWidth, family: typo.family, layout: typo.layout,
+      sizeMode: typo.sizeMode, speed: typo.speed, rate: typo.rate, life: typo.life,
+      kaleido: typo.kaleido,
+    } : null,
+    // Live (camera)
+    cam: (typeof cam !== 'undefined') ? {
+      track: cam.track, faceFx: cam.faceFx, handFx: cam.handFx,
+      videoOpacity: cam.videoOpacity, fxSize: cam.fxSize, mirror: cam.mirror,
+      kaleido: cam.kaleido, removeBg: cam.removeBg,
+    } : null,
   };
-  // Preserve webcamFX + typography across random rolls — they're persistent input/output
-  // streams (camera feed, live text), not generative field modes.
+  // Always preserve webcamFX + typography modes (camera/text are live streams, not generative).
+  // Also reset emotions to 0 so the new roll starts clean.
+  for(const e of EMOTIONS) state.values[e.id] = 0;
   const _keepWebcam = state.modes.webcamFX;
   const _keepTypo   = state.modes.typography;
   for(const k in state.modes) state.modes[k] = (k === 'base');
@@ -4750,7 +4816,7 @@ function randomizeAll(){
   state.turbulence = lerp(0.05 + Math.random()*0.4, 0.8 + Math.random()*1.1, hot);
   state.glow = 0.3 + Math.random()*1.1;
 
-  // 5. Visual / color
+  // 5. Visual / color (includes lightMode now — ~15% chance to flip)
   state.vibrance = Math.round(clamp(20 + Math.random()*40 + hot*55, 0, 100));
   state.hueShift = Math.round((Math.random()-0.5)*360);
   state.bgDark   = Math.random() * 0.7;
@@ -4758,6 +4824,7 @@ function randomizeAll(){
   state.trails   = Math.max(0, cool*0.55 + Math.random()*0.35 - 0.1);
   state.grain    = Math.random() * 0.75;
   state.vignette = Math.random() * 0.6;
+  state.lightMode = Math.random() < 0.15;
 
   // 6. Mirror / kaleido — much more likely on hot/intense music
   if(Math.random() < hot*0.7 + 0.05){
@@ -4766,19 +4833,46 @@ function randomizeAll(){
   }
   state.mirror = Math.random() < hot*0.35 + 0.05 ? 1 + Math.floor(Math.random()*3) : 0;
 
-  // 7. Visual modes — 1–4 active, biased by intensity
-  // Categorize modes by 'energy' — hot tracks favor explosive/symmetric, cool favors flowy/sparse
+  // 7. Visual modes — performance-bounded pick (target ≥45fps).
+  // Each mode has a cost weight; total must stay below the per-device budget.
+  // Hard rules: pixel8 ⊣ popArt (mutually exclusive), heavy modes cap kaleido.
+  const MODE_COST = {
+    lineTrace:1, constellation:1, waveform:1, mandalaRings:1, ripples:1, petals:1,
+    flowField:2, ribbons:2, aurora:2, spiral:2, crystals:2, tunnel:2, halftone:2, polygon:2,
+    inkWash:3, matrix:3, eva:3,
+    popArt:4, glitch:4,
+    pixel8:5,
+  };
+  // Budget — tuned for ~45-60fps on typical hardware. Larger pixelRatio screens get less.
+  const budgetBase = state.pixelRatio >= 2 ? 6 : 8;
+  const budget = budgetBase + Math.floor(hot * 2);  // hot music allowed a little more chaos
+
   const hotModes  = ['crystals','ripples','spiral','tunnel','mandalaRings','halftone','popArt','glitch','polygon','matrix','eva','pixel8'];
   const coolModes = ['lineTrace','flowField','constellation','ribbons','petals','aurora','waveform','inkWash','polygon','matrix'];
-  const nModes = 1 + Math.floor(Math.random()*(1 + hot*3.2));
+  const maxModes = 3;
+  const targetN = Math.min(maxModes, 1 + Math.floor(Math.random()*(1 + hot*2.2)));
   const enabled = new Set();
-  for(let i=0;i<nModes;i++){
+  let spent = 0;
+  for(let i=0;i<targetN*3 && enabled.size<targetN;i++){  // extra attempts to skip too-expensive picks
     const pool = Math.random() < hot*0.7 + 0.15 ? hotModes : coolModes;
-    let pick; let tries=0;
-    do { pick = pool[Math.floor(Math.random()*pool.length)]; tries++; } while(enabled.has(pick) && tries<10);
+    const pick = pool[Math.floor(Math.random()*pool.length)];
+    if(enabled.has(pick)) continue;
+    // Mutual-exclusion: pixel8 + popArt is murder
+    if(pick === 'pixel8' && enabled.has('popArt')) continue;
+    if(pick === 'popArt' && enabled.has('pixel8')) continue;
+    const cost = MODE_COST[pick] || 1;
+    if(spent + cost > budget) continue;
     enabled.add(pick);
+    spent += cost;
     state.modes[pick] = true;
   }
+  // Kaleido cap: heavy mode (cost ≥ 4) limits kaleido to 4 segs; pixel8 forces it off
+  let maxKal = 16;
+  for(const m of enabled){
+    if(MODE_COST[m] >= 4) maxKal = Math.min(maxKal, 4);
+    if(m === 'pixel8') maxKal = 0;
+  }
+  if(state.kaleido > maxKal) state.kaleido = maxKal;
 
   // 8. Audio reactivity strengths — DO NOT change when music is loaded
   //    (so the user's uploaded track keeps driving visuals at the same sensitivity)
@@ -4818,25 +4912,71 @@ function randomizeAll(){
     imgState.modes[m] = true;
   }
 
-  // 10. Honor locks — restore snapshotted groups (locked → preserved across random)
-  if(L.style){
-    state.modes = { ...snap.modes };
+  // 10. Type tab — randomize typography params (only when typography is on AND unlocked)
+  if(state.modes.typography && typeof typo !== 'undefined'){
+    const animPool = ['breathe','flow','wave','popIn','glitch','drift','scalePulse','rotate','shimmer','comic'];
+    typo.anim = animPool[Math.floor(Math.random()*animPool.length)];
+    const stylePool = ['solid','outline','mix','split'];
+    typo.style = stylePool[Math.floor(Math.random()*stylePool.length)];
+    const colorPool = ['auto','random','#000000','#ffffff','#f3eee6','#ff3344','#ffcc22','#1e88ff','#c87cff','#9bd3a7','#ff7a9c'];
+    typo.color = colorPool[Math.floor(Math.random()*colorPool.length)];
+    typo.weight = [100,300,500,700,900][Math.floor(Math.random()*5)];
+    typo.outlineWidth = 0.02 + Math.random()*0.10;
+    typo.speed = 0.4 + Math.random()*1.6;
+    typo.rate = 0.5 + Math.random()*3.5;
   }
-  if(L.color){
-    state.vibrance = snap.vibrance; state.hueShift = snap.hueShift; state.bgDark = snap.bgDark;
-    state.bloom = snap.bloom; state.trails = snap.trails; state.grain = snap.grain; state.vignette = snap.vignette;
+
+  // 11. Live tab — randomize camera fx pick (camera state itself untouched)
+  if(typeof cam !== 'undefined'){
+    const faceFxPool = ['tendrils','petals','rays','orbits','ribbon','pulse','confetti','prism','stars','hearts','duplicate','splitTile','trail','emit'];
+    const handFxPool = faceFxPool;
+    cam.faceFx = faceFxPool[Math.floor(Math.random()*faceFxPool.length)];
+    cam.handFx = handFxPool[Math.floor(Math.random()*handFxPool.length)];
+    cam.fx = cam.track === 'face' ? cam.faceFx : cam.handFx;
+    cam.fxSize = 0.5 + Math.random()*1.5;
   }
-  if(L.motion){
+
+  // 12. Honor locks — restore snapshotted groups. Each lock = one tab.
+  if(L.feelings){
+    for(const e of EMOTIONS) state.values[e.id] = snap.values[e.id] || 0;
+    state.temp = snap.temp;
+  }
+  if(L.field){
     state.density = snap.density; state.motionSpeed = snap.motionSpeed;
     state.turbulence = snap.turbulence; state.glow = snap.glow;
+  }
+  if(L.visual){
+    state.vibrance = snap.vibrance; state.hueShift = snap.hueShift; state.bgDark = snap.bgDark;
+    state.bloom = snap.bloom; state.trails = snap.trails; state.grain = snap.grain; state.vignette = snap.vignette;
+    state.kaleido = snap.kaleido; state.mirror = snap.mirror; state.lightMode = snap.lightMode;
+  }
+  if(L.style){
+    state.modes = { ...snap.modes };
   }
   if(L.audio){
     state.audioGain = snap.audioGain; state.bassImpact = snap.bassImpact;
     state.midImpact = snap.midImpact; state.trebleImpact = snap.trebleImpact;
   }
-  if(L.mirror){
-    state.kaleido = snap.kaleido; state.mirror = snap.mirror;
+  if(L.image && snap.img && imgState){
+    Object.assign(imgState, {
+      arrangement: snap.img.arrangement, count: snap.img.count, spawnRate: snap.img.spawnRate,
+      opacity: snap.img.opacity, effectStrength: snap.img.effectStrength, scale: snap.img.scale,
+      blend: snap.img.blend, useAllImages: snap.img.useAllImages, cycle: snap.img.cycle,
+    });
+    if(snap.img.modes) imgState.modes = { ...snap.img.modes };
   }
+  if(L.type && snap.typo && typeof typo !== 'undefined'){
+    Object.assign(typo, snap.typo);
+  }
+  if(L.live && snap.cam && typeof cam !== 'undefined'){
+    Object.assign(cam, snap.cam);
+    cam.fx = cam.track === 'face' ? cam.faceFx : cam.handFx;
+  }
+
+  // Sync UI for things outside syncAllUI's normal coverage
+  if(typeof applyLightMode === 'function') applyLightMode();
+  const lmCb = document.getElementById('lightModeToggle');
+  if(lmCb) lmCb.checked = !!state.lightMode;
 
   syncAllUI();
 }
@@ -5628,10 +5768,11 @@ document.querySelectorAll('.lock-chip').forEach(chip => {
   });
 });
 
-// Light mode — invert canvas luminance while preserving hue via CSS filter trick.
-// invert(1) flips RGB, hue-rotate(180) undoes the hue flip → net effect = luminance inversion.
+// Light mode — paper canvas (drawBackground + bgClearColor paint cream natively now).
+// We DON'T use a CSS invert filter anymore — that was a full-screen GPU pass per frame
+// and was the actual cause of lag in light mode. Body bg follows so the page chrome matches.
 function applyLightMode(){
-  cv.style.filter = state.lightMode ? 'invert(1) hue-rotate(180deg)' : '';
+  cv.style.filter = '';
   document.body.style.background = state.lightMode ? '#f4ede0' : '';
 }
 const lightModeToggle = document.getElementById('lightModeToggle');
