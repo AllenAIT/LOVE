@@ -1872,7 +1872,16 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-17b');
+console.log('[IW] script booting · build 2026-05-17c');
+
+// Click diagnostics — log every click so we can see where they reach.
+// Capture phase so we see clicks BEFORE any interceptor swallows them.
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  const tag = t && t.tagName;
+  const id = (t && t.id) || (t && t.closest('[id]') && t.closest('[id]').id) || '(no id)';
+  console.log('[IW] click @', tag, '· closest-id:', id, '· trusted:', e.isTrusted, '· phase: capture');
+}, true);
 
 const EMOTIONS = [
   { id:"love",      name:"Love",      whisper:"warm & expanding",   hue:[348, 18],  sat:80, light:64, glow:"#ffb6c1", style:"bloom"    },
