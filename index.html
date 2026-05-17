@@ -1931,7 +1931,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-17d · lyrics DOM caption');
+console.log('[IW] script booting · build 2026-05-17e · lyrics caption CENTER');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -3791,38 +3791,50 @@ function clearLyrics(){
   if(typeof _setLyricCaption === 'function') _setLyricCaption('');
 }
 
-// DOM caption overlay — guaranteed-visible subtitle that mirrors the current
-// lyric line, regardless of what the canvas typography path is doing.
-// Created eagerly on script load so we know up-front whether DOM injection works.
+// DOM caption overlay — guaranteed-visible subtitle, CENTER of screen.
+// Created eagerly on script load and re-injected aggressively (attached to
+// <html> rather than <body> in case body has transforms / overflow:hidden that
+// would clip a fixed-position child).
 function _ensureLyricCaptionEl(){
   let el = document.getElementById('lyricsCaptionOverlay');
-  if(el) return el;
+  if(el && el.isConnected) return el;
   el = document.createElement('div');
   el.id = 'lyricsCaptionOverlay';
+  el.setAttribute('aria-live','polite');
+  // Use cssText with !important so app stylesheets can't override
   el.style.cssText = [
-    'position:fixed','left:50%','bottom:12vh','transform:translateX(-50%)',
-    'max-width:92vw','padding:18px 30px','border-radius:16px',
-    'background:rgba(0,0,0,.65)','backdrop-filter:blur(10px)',
-    '-webkit-backdrop-filter:blur(10px)',
-    'color:#fff','font-family:"Recursive","Noto Sans TC","Noto Sans JP",sans-serif',
-    'font-size:clamp(22px,4vw,52px)','font-weight:600',
-    'letter-spacing:.02em','text-align:center','line-height:1.3',
-    'text-shadow:0 2px 14px rgba(0,0,0,.85),0 0 32px rgba(0,0,0,.6)',
-    'border:1px solid rgba(255,255,255,.18)',
-    'z-index:2147483600','pointer-events:none',
-    'opacity:0','transition:opacity .18s ease-out',
-    'display:none','white-space:pre-wrap','user-select:none'
+    'position:fixed !important',
+    'left:50% !important',
+    'top:50% !important',
+    'transform:translate(-50%,-50%) !important',
+    'max-width:90vw !important',
+    'padding:22px 36px !important',
+    'border-radius:18px !important',
+    'background:rgba(0,0,0,.7) !important',
+    'color:#fff !important',
+    'font-family:"Recursive","Noto Sans TC","Noto Sans JP",sans-serif !important',
+    'font-size:clamp(28px,5vw,68px) !important',
+    'font-weight:700 !important',
+    'text-align:center !important',
+    'line-height:1.3 !important',
+    'text-shadow:0 2px 14px rgba(0,0,0,.9),0 0 28px rgba(0,0,0,.7) !important',
+    'border:1px solid rgba(255,255,255,.2) !important',
+    'z-index:2147483647 !important',
+    'pointer-events:none !important',
+    'opacity:0',
+    'transition:opacity .18s ease-out',
+    'display:none',
+    'white-space:pre-wrap',
+    'user-select:none'
   ].join(';');
-  if(document.body){
-    document.body.appendChild(el);
-    console.log('[IW] lyric caption overlay injected · id=lyricsCaptionOverlay');
+  // Attach to <html> so body transforms/clipping can't hide it
+  const host = document.documentElement || document.body;
+  if(host){
+    host.appendChild(el);
+    console.log('[IW] lyric caption overlay injected → ' + host.tagName);
   } else {
-    // body not ready yet — retry once DOM parsed
     document.addEventListener('DOMContentLoaded', () => {
-      if(!document.getElementById('lyricsCaptionOverlay')){
-        document.body.appendChild(el);
-        console.log('[IW] lyric caption overlay injected (deferred)');
-      }
+      (document.documentElement || document.body).appendChild(el);
     }, { once:true });
   }
   return el;
@@ -3838,20 +3850,19 @@ function _setLyricCaption(text){
     }
     el.textContent = text;
     el.style.display = 'block';
-    void el.offsetWidth;  // force reflow so transition fires from 0
+    void el.offsetWidth;
     el.style.opacity = '1';
   } catch(err){
     console.warn('[IW] _setLyricCaption error:', err);
   }
 }
-// Create overlay immediately so its presence is verifiable from the start.
-// Brief "ready" pulse so the user sees the bar appear once on load.
+// Eager-create + visible startup pulse so user can confirm the new build loaded.
 _ensureLyricCaptionEl();
 window._lyricCaption = _setLyricCaption;  // expose for console testing
 setTimeout(() => {
-  _setLyricCaption('✓ lyric caption ready');
-  setTimeout(() => _setLyricCaption(''), 1400);
-}, 300);
+  _setLyricCaption('✓ build 2026-05-17e · caption ready');
+  setTimeout(() => _setLyricCaption(''), 1800);
+}, 400);
 
 // Clear any lyric currently displayed (for long instrumental gaps + end of song).
 // Immediate cut — wipes spawned words, center text, and typewriter state so the
