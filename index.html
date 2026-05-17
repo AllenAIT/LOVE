@@ -6710,35 +6710,57 @@ function randomSalt(){
     if(hint) hint.textContent = ex && ex.email ? ex.email : 'no local record';
   }
 
-  // ——— Welcome stage buttons ———
-  const signInBtn = document.getElementById('gateSignInBtn');
-  if(tryBtn) tryBtn.addEventListener('click', () => {
-    state.previewMode = true;
-    hideGate();
-    if(previewCta) previewCta.classList.remove('hidden');
+  // ——— Welcome / Login / Register / Forgot buttons via DOCUMENT delegation ———
+  // Delegated so the wiring survives any IIFE / script-order weirdness and any
+  // obfuscation surprises — we listen on the overlay itself with a single handler.
+  overlay.addEventListener('click', (e) => {
+    const btn = e.target.closest('button, .gate-link, [data-gate-action]');
+    if(!btn || !overlay.contains(btn)) return;
+    const id = btn.id || '';
+    switch(id){
+      case 'gateTryBtn':
+        state.previewMode = true;
+        hideGate();
+        if(previewCta) previewCta.classList.remove('hidden');
+        e.stopPropagation();
+        break;
+      case 'gateSignInBtn':
+      case 'gateSwitchLogin':
+        showLogin();
+        e.stopPropagation();
+        break;
+      case 'gateRegisterBtn':
+      case 'gateSwitchRegister':
+        showRegister();
+        e.stopPropagation();
+        break;
+      case 'gateBackBtn':
+      case 'gateLoginBackBtn':
+      case 'gateForgotBack':
+        showWelcome();
+        e.stopPropagation();
+        break;
+      case 'gateForgotBtn':
+        showForgot();
+        e.stopPropagation();
+        break;
+      case 'gateForgotCopy':
+        (async () => {
+          try { await navigator.clipboard.writeText('ai.allen.task@gmail.com'); btn.textContent = 'copied'; }
+          catch(_){ btn.textContent = 'manual copy'; }
+          setTimeout(() => { btn.textContent = 'copy'; }, 1500);
+        })();
+        e.stopPropagation();
+        break;
+    }
   });
-  if(signInBtn) signInBtn.addEventListener('click', () => { showLogin(); });
-  if(regBtn) regBtn.addEventListener('click', () => { showRegister(); });
-  if(backBtn) backBtn.addEventListener('click', () => { showWelcome(); });
-  if(loginBack) loginBack.addEventListener('click', () => { showWelcome(); });
-  if(switchLogin) switchLogin.addEventListener('click', () => { showLogin(); });
-  if(switchRegister) switchRegister.addEventListener('click', () => { showRegister(); });
+
   if(previewCta) previewCta.addEventListener('click', () => {
     const ex = getRegisteredUser();
     if(ex) showLogin(); else showRegister();
   });
 
-  // ——— Forgot password wiring ———
-  const forgotBtn = document.getElementById('gateForgotBtn');
-  const forgotBack = document.getElementById('gateForgotBack');
-  const forgotCopy = document.getElementById('gateForgotCopy');
-  if(forgotBtn) forgotBtn.addEventListener('click', () => { showForgot(); });
-  if(forgotBack) forgotBack.addEventListener('click', () => { showLogin(); });
-  if(forgotCopy) forgotCopy.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText('ai.allen.task@gmail.com'); forgotCopy.textContent = 'copied'; }
-    catch(_){ forgotCopy.textContent = 'manual copy'; }
-    setTimeout(() => { forgotCopy.textContent = 'copy'; }, 1500);
-  });
+  // (forgot copy / forgot view wiring is handled by the overlay delegation above)
 
   function setBtnLoading(btnEl, loading, originalText){
     if(!btnEl) return;
