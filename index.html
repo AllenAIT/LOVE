@@ -1926,7 +1926,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-17g · canvas lyrics, no early-return');
+console.log('[IW] script booting · build 2026-05-17h · HUD shows typo.text');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -3828,7 +3828,13 @@ function _updateLyricsHUD(){
     const idx = lyrics.currentIdx;
     const next = lyrics.lines[idx + 1];
     const nextIn = next ? Math.max(0, next.time - t).toFixed(1) + 's' : '—';
-    el.textContent = `♪ ${paused ? 'PAUSED' : 'PLAY'} ${t.toFixed(2)}s · line ${idx+1}/${lyrics.lines.length} · next in ${nextIn}`;
+    const tt = (typeof typo !== 'undefined' && typo.text) ? typo.text.slice(0, 40) : '(empty)';
+    const tmode = (typeof state !== 'undefined' && state.modes && state.modes.typography) ? 'ON' : 'OFF';
+    const showing = lyrics._lineShowing ? 'SHOW' : 'idle';
+    el.textContent =
+      `♪ ${paused ? 'PAUSED' : 'PLAY'} ${t.toFixed(2)}s · line ${idx+1}/${lyrics.lines.length} · next ${nextIn} · ${showing}\n` +
+      `typography mode: ${tmode}\n` +
+      `typo.text = "${tt}"`;
     el.style.display = 'block';
   } catch(_){}
 }
@@ -3980,6 +3986,17 @@ function tickLyricsSync(){
     if(t > lineEnd){
       _clearLyricFromTypo();
       lyrics._lineShowing = false;
+    }
+  }
+
+  // Defensive: while a line is showing, keep typo.text pinned to that line so
+  // any other code path that touches typo.text (typeText reset, simulator,
+  // randomizer) can't smuggle the default phrases back onto the canvas.
+  if(lyrics._lineShowing && lyrics.currentIdx >= 0){
+    const cur = lyrics.lines[lyrics.currentIdx];
+    if(cur && typo.text !== cur.text){
+      typo.text = cur.text;
+      typo.centerCurrent = cur.text;
     }
   }
 
