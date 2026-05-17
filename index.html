@@ -9436,10 +9436,6 @@ document.getElementById('kaleidoLink').addEventListener('change', e => {
 /* —— Floating buttons + Presentation mode ——————————————————————— */
 (() => {
   const $ = (id) => document.getElementById(id);
-  $('fabRandom').addEventListener('click', () => {
-    const btn = $('randomize');
-    if(btn) btn.click();
-  });
 
   let presentWin = null, presentStream = null;
   async function openPresent(){
@@ -9536,8 +9532,20 @@ setTimeout(() => { const h = document.getElementById('h'); if(h) h.classList.add
   function closePresent(){
     if(presentWin && !presentWin.closed){ try{ presentWin.close(); }catch(_){} }
   }
-  document.getElementById('fabPresent').addEventListener('click', () => {
-    if(presentWin && !presentWin.closed) closePresent(); else openPresent();
+
+  // Robust document delegation — survives obfuscation + IIFE order + late DOM updates.
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if(!t || !t.closest) return;
+    if(t.closest('#fabRandom')){
+      const btn = $('randomize');
+      if(btn) btn.click();
+      return;
+    }
+    if(t.closest('#fabPresent')){
+      if(presentWin && !presentWin.closed) closePresent(); else openPresent();
+      return;
+    }
   });
 })();
 
