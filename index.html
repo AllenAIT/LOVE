@@ -1963,25 +1963,39 @@ async function _togglePresent(){
     return;
   }
   _presentState.win = popup;
-  const html = '<!doctype html><html><head><meta charset="utf-8"/>'
-    + '<title>Inner Weather — Present</title>'
-    + '<style>html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}'
+  // Write the popup HTML via DOM API instead of a string with literal <script>.
+  // (A string literal containing "<script>" gets folded by esbuild minify even when
+  // we split it, and then ANY tool that mis-sniffs content-type renders our whole
+  // bundle as text. DOM API has no literal script tag in the source.)
+  popup.document.open();
+  popup.document.write('<!doctype html><html><head><meta charset="utf-8"/><title>Inner Weather — Present</title></head><body></body></html>');
+  popup.document.close();
+  const pdoc = popup.document;
+  // Style
+  const styleEl = pdoc.createElement('style');
+  styleEl.textContent = 'html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}'
     + 'video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;background:#000}'
     + '.hint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);color:rgba(255,255,255,.5);'
     + 'font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:11px;letter-spacing:.16em;'
     + 'text-transform:uppercase;background:rgba(0,0,0,.4);padding:6px 14px;border-radius:999px;'
     + 'backdrop-filter:blur(10px);transition:opacity .8s;pointer-events:none}'
-    + '.hint.gone{opacity:0}</style></head><body>'
-    + '<video id="v" autoplay playsinline></video>'
-    + '<div class="hint" id="h">Click to fullscreen · Esc closes · F toggles</div>'
-    + '<scr' + 'ipt>'
-    + 'document.addEventListener("click",function(){if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen()});'
+    + '.hint.gone{opacity:0}';
+  pdoc.head.appendChild(styleEl);
+  // Video + hint
+  const vidEl = pdoc.createElement('video');
+  vidEl.id = 'v'; vidEl.autoplay = true; vidEl.playsInline = true;
+  pdoc.body.appendChild(vidEl);
+  const hintEl = pdoc.createElement('div');
+  hintEl.id = 'h'; hintEl.className = 'hint';
+  hintEl.textContent = 'Click to fullscreen · Esc closes · F toggles';
+  pdoc.body.appendChild(hintEl);
+  // Script via DOM (no literal <script> in source string)
+  const scrEl = pdoc.createElement('script');
+  scrEl.textContent =
+    'document.addEventListener("click",function(){if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen()});'
     + 'window.addEventListener("keydown",function(e){if(e.key==="Escape")window.close();if(e.key==="f"||e.key==="F"){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}});'
-    + 'setTimeout(function(){var h=document.getElementById("h");if(h)h.classList.add("gone")},4000);'
-    + '</scr' + 'ipt></body></html>';
-  popup.document.open();
-  popup.document.write(html);
-  popup.document.close();
+    + 'setTimeout(function(){var h=document.getElementById("h");if(h)h.classList.add("gone")},4000);';
+  pdoc.body.appendChild(scrEl);
   await new Promise(r => setTimeout(r, 100));
   try {
     const stream = cv.captureStream(60);
@@ -2612,7 +2626,13 @@ function frame(now){
   perf._lastNow = now;
   state.beatFlash *= 0.90;
   reactor.update();
-  if(typeof tickLyricsSync === 'function') tickLyricsSync();
+  if(typeof tickLyricsSync === 'function'){
+    try { tickLyricsSync(); }
+    catch(err){
+      console.warn('[IW] tickLyricsSync error (auto-disabled):', err);
+      if(typeof lyrics !== 'undefined') lyrics.enabled = false;
+    }
+  }
   // auto-cycle visual modes based on music sections
   if(window._maybeAutoCycle) window._maybeAutoCycle(now);
 

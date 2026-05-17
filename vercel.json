@@ -1,8 +1,31 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build:safe",
   "outputDirectory": "dist",
   "framework": null,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Content-Type-Options", "value": "nosniff" }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "headers": [
+        { "key": "Content-Type", "value": "text/html; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [
+        { "key": "Content-Type", "value": "text/html; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/", "destination": "/index.html" }
   ]
 }
+
