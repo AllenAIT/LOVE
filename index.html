@@ -3785,17 +3785,58 @@ function clearLyrics(){
   lyrics.enabled = false;
   lyrics.currentIdx = -1;
   lyrics.currentSection = null;
+  if(typeof _setLyricCaption === 'function') _setLyricCaption('');
+}
+
+// DOM caption overlay — guaranteed-visible subtitle that mirrors the current
+// lyric line, regardless of what the canvas typography path is doing. Created
+// lazily on first use; bottom-center, large font, high z-index.
+function _ensureLyricCaptionEl(){
+  let el = document.getElementById('lyricsCaptionOverlay');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'lyricsCaptionOverlay';
+  el.style.cssText = [
+    'position:fixed','left:50%','bottom:8vh','transform:translateX(-50%)',
+    'max-width:90vw','padding:14px 26px','border-radius:14px',
+    'background:rgba(0,0,0,.55)','backdrop-filter:blur(8px)',
+    '-webkit-backdrop-filter:blur(8px)',
+    'color:#fff','font-family:"Recursive","Noto Sans TC",sans-serif',
+    'font-size:clamp(20px,3.6vw,44px)','font-weight:500',
+    'letter-spacing:.02em','text-align:center','line-height:1.3',
+    'text-shadow:0 2px 12px rgba(0,0,0,.7),0 0 24px rgba(0,0,0,.5)',
+    'z-index:2147483600','pointer-events:none',
+    'opacity:0','transition:opacity .15s ease-out',
+    'display:none'
+  ].join(';');
+  document.body.appendChild(el);
+  return el;
+}
+function _setLyricCaption(text){
+  const el = _ensureLyricCaptionEl();
+  if(!text){
+    el.style.opacity = '0';
+    // hide after fade
+    setTimeout(() => { if(el.style.opacity === '0') el.style.display = 'none'; }, 200);
+    return;
+  }
+  el.textContent = text;
+  el.style.display = 'block';
+  // force reflow so transition fires from 0
+  void el.offsetWidth;
+  el.style.opacity = '1';
 }
 
 // Clear any lyric currently displayed (for long instrumental gaps + end of song).
 // Immediate cut — wipes spawned words, center text, and typewriter state so the
-// screen goes blank as soon as the line is "done".
+// screen goes blank as soon as the line is "done". Also hides the DOM caption.
 function _clearLyricFromTypo(){
   if(typeof typo === 'undefined') return;
   typo.text = '';
   typo.centerCurrent = null;
   typo._tw = null;
   if(Array.isArray(typo.spawns)) typo.spawns.length = 0;
+  _setLyricCaption('');
 }
 
 // Estimate how long a lyric line should be shown given its text.
@@ -3822,7 +3863,9 @@ function _applyLyricToTypo(text, durationSec){
   if(typeof typo === 'undefined') return;
   text = (text || '').trim();
   console.log('[IW] lyrics line:', text || '(empty)', durationSec != null ? `· ${durationSec.toFixed(2)}s` : '');
-  if(!text){ return; }
+  if(!text){ _setLyricCaption(''); return; }
+  // DOM caption — guaranteed visible subtitle, independent of canvas pipeline
+  _setLyricCaption(text);
   // Phrase pool = just this line (used by spawn-based anims)
   typo.text = text;
   // morphCenter / typewriter — drive center text directly, never auto-swap
