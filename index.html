@@ -810,6 +810,22 @@
       <!-- IMAGE -->
       <section class="tab" data-tab="image">
         <div class="section">
+          <h3 class="section-title">Sketch <em style="font-size:11px;color:var(--ink-faint);font-style:normal;letter-spacing:.12em;text-transform:uppercase;margin-left:6px">線條 · AI line-art</em></h3>
+          <div style="display:flex;gap:6px;align-items:stretch">
+            <input id="sketchInput" type="text" placeholder="心臟 · 大象 · heartbeat · elephant…" style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--ink);border-radius:7px;padding:8px 10px;font-family:var(--sans);font-size:12px;outline:none" />
+            <button class="audio-btn" id="sketchGo" style="flex:0 0 70px">Draw</button>
+          </div>
+          <div id="sketchHint" class="type-tip" style="margin-top:6px">type any object — Claude draws a Picasso-style single-line glyph on top.</div>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button class="phrase-chip" data-sketch="心臟">心臟</button>
+            <button class="phrase-chip" data-sketch="大象">大象</button>
+            <button class="phrase-chip" data-sketch="魚">魚</button>
+            <button class="phrase-chip" data-sketch="花">花</button>
+            <button class="phrase-chip" data-sketch="">✕ clear</button>
+          </div>
+        </div>
+
+        <div class="section">
           <h3 class="section-title">Upload</h3>
           <div class="img-drop" id="imgDrop">
             <input type="file" id="imgInput" accept="image/*" multiple style="display:none" />
@@ -1349,6 +1365,16 @@ const state = {
   },
   // inverse palette — white canvas, dark content. CSS filter (invert + hue-rotate) preserves hue.
   lightMode: false,
+  // line-art sketch — AI-generated SVG paths drawn as a top layer (Picasso-style glyph)
+  sketch: {
+    enabled: false,
+    prompt: '',
+    paths: [],        // array of path-d strings
+    anim: 'static',   // 'pulse' | 'breathe' | 'drift' | 'static'
+    viewBox: [0, 0, 200, 200],
+    color: '#0a0a0a',
+    born: 0,
+  },
   // auto-cycle modes based on music sections
   autoCycle: false,
   autoSec: 14,            // seconds between switches (also triggered by energy change)
@@ -1710,8 +1736,15 @@ function compositeToMain(){
   const v = state.vibrance/100;
   // wide dynamic range — very muted at 0, very vivid at 100
   const sat = 0.25 + Math.pow(v, 1.55) * 3.35;
-  const bri = 0.82 + v * 0.50;
-  const con = 0.90 + v * 0.55;
+  // In lightMode (white canvas), the standard brightness boost overexposes everything to white.
+  // Invert direction: vibrance now DARKENS toward visibility, and contrast pulls detail forward.
+  // In dark mode, keep the original brightness boost so vivid hues pop.
+  const bri = state.lightMode
+    ? 1.00 - v * 0.35
+    : 0.82 + v * 0.50;
+  const con = state.lightMode
+    ? 0.95 + v * 0.85
+    : 0.90 + v * 0.55;
   const hue = state.hueShift || 0;
   const filterStr = `saturate(${sat.toFixed(2)}) brightness(${bri.toFixed(2)}) contrast(${con.toFixed(2)}) hue-rotate(${hue|0}deg)`;
 
@@ -1795,11 +1828,12 @@ function compositeToMain(){
     ctx.restore();
   }
 
-  // Bloom — redraw blurred + additive
+  // Bloom — additive in dark mode (lights pop), MULTIPLY in light mode (deepens shadows)
+  // 'lighter' on cream bg = instantly clipped to white. 'multiply' gives soft ink-spread.
   if(state.bloom > 0.02){
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = state.bloom * 0.55;
+    ctx.globalCompositeOperation = state.lightMode ? 'multiply' : 'lighter';
+    ctx.globalAlpha = state.bloom * (state.lightMode ? 0.35 : 0.55);
     ctx.filter = `blur(${(8 + state.bloom*22)|0}px) saturate(${(1+state.vibrance/120).toFixed(2)})`;
     ctx.drawImage(srcCv, 0, 0, W, H);
     ctx.filter = 'none';
@@ -2045,9 +2079,64 @@ document.getElementById('randomize').addEventListener('click', ()=>{
   if(typeof randomizeAll === 'function') randomizeAll();
 });
 document.getElementById('reset').addEventListener('click', ()=>{
+  // Full reset to defaults — visuals, modes, atmosphere, motion, audio, lightMode.
+  // Preserves: webcamFX + typography mode flags (running streams), locks (user prefs), bpm.
+  const keepWebcam = state.modes.webcamFX;
+  const keepTypo   = state.modes.typography;
+  // Emotions + temp
   for(const e of EMOTIONS) state.values[e.id] = DEFAULTS[e.id] || 0;
-  for(const e of EMOTIONS) updateRow(e.id);
-  state.temp = 42; updateTemp(); updateReadout();
+  state.temp = 42;
+  // Field
+  state.density = 1.0; state.motionSpeed = 1.0;
+  state.turbulence = 0.5; state.glow = 0.7;
+  // Visual / atmosphere
+  state.vibrance = 50; state.hueShift = 0;
+  state.bgDark = 0.3; state.bloom = 0.3;
+  state.trails = 0; state.grain = 0.5; state.vignette = 0.5;
+  state.kaleido = 0; state.mirror = 0;
+  state.lightMode = false;
+  // Audio reactivity
+  state.audioGain = 1.0; state.bassImpact = 1.0;
+  state.midImpact = 1.0; state.trebleImpact = 1.0;
+  // Modes — all off except base, preserve live streams
+  for(const k in state.modes) state.modes[k] = (k === 'base');
+  state.modes.webcamFX   = keepWebcam;
+  state.modes.typography = keepTypo;
+  // Clear accumulated artifacts so old strokes/particles vanish
+  if(modeState){
+    modeState.trace.path.length = 0;
+    modeState.flow.length = 0;
+    modeState.rings.length = 0;
+    modeState.ripples = [];
+    modeState.petals = [];
+    modeState.ringTimer = 0;
+    modeState.rippleTimer = 0;
+  }
+  if(typeof bursts !== 'undefined') bursts.length = 0;
+  if(typeof _inkStrokes !== 'undefined') _inkStrokes.length = 0;
+  if(typeof _matrixCols !== 'undefined') _matrixCols = null;
+  if(typeof _polyVerts !== 'undefined') _polyVerts = null;
+  for(const f of fields){ f.blobs.length=0; f.particles.length=0; f.init(); }
+  srcCtx.fillStyle = bgClearColor(); srcCtx.fillRect(0,0,W,H);
+
+  // Sync all UI elements
+  if(typeof syncAllUI === 'function') syncAllUI();
+  if(typeof applyLightMode === 'function') applyLightMode();
+  const lmCb = document.getElementById('lightModeToggle');
+  if(lmCb) lmCb.checked = false;
+  // Mode checkboxes
+  document.querySelectorAll('#modes input').forEach(cb => {
+    cb.checked = !!state.modes[cb.dataset.mode];
+  });
+  // Mirror seg
+  document.querySelectorAll('#mirrorSeg button').forEach(x =>
+    x.classList.toggle('on', +x.dataset.m === 0));
+  const mv = document.getElementById('mirrorVal'); if(mv) mv.textContent = 'none';
+  // Kaleido seg
+  document.querySelectorAll('#kaleidoSeg button').forEach(x =>
+    x.classList.toggle('on', +x.dataset.k === 0));
+  const kv = document.getElementById('kaleidoVal'); if(kv) kv.textContent = 'off';
+  updateReadout();
 });
 document.getElementById('generate').addEventListener('click', ()=>{
   // poetic composition: pick a primary + 2-3 secondaries
@@ -4825,12 +4914,14 @@ function randomizeAll(){
   state.grain    = Math.random() * 0.75;
   state.vignette = Math.random() * 0.6;
   state.lightMode = Math.random() < 0.15;
-  // Re-tune when light mode is on — keep paper clean, retain ink, less bloom
+  // Re-tune when light mode is on — keep paper clean, retain ink, less bloom, less vibrance
   if(state.lightMode){
     state.bgDark = Math.random() * 0.25;
     state.trails = 0.30 + Math.random() * 0.40;
     state.bloom  = Math.random() * 0.30;
     state.vignette = Math.random() * 0.35;
+    // Cap vibrance — high values overexpose dark content to invisibility on cream bg
+    state.vibrance = Math.round(20 + Math.random() * 40);  // 20-60 range
   }
 
   // 6. Mirror / kaleido — much more likely on hot/intense music
@@ -7221,6 +7312,7 @@ function snapshotTypo(){
     color: typo.color, speed: typo.speed, rate: typo.rate,
     life: typo.life, density: typo.density, loop: typo.loop,
     sizeScale: typo.sizeScale, style: typo.style, kaleido: typo.kaleido,
+    weight: typo.weight, outlineWidth: typo.outlineWidth,
   };
 }
 function preserveLayersAround(btnId){
@@ -7289,7 +7381,15 @@ function captureSnapshot(){
       color: typo.color, speed: typo.speed, rate: typo.rate,
       life: typo.life, density: typo.density, loop: typo.loop,
       sizeScale: typo.sizeScale, style: typo.style, kaleido: typo.kaleido,
+      weight: typo.weight, outlineWidth: typo.outlineWidth,
     },
+    // light mode + sketch (line-art glyph)
+    lightMode: !!state.lightMode,
+    sketch: state.sketch ? {
+      enabled: state.sketch.enabled, prompt: state.sketch.prompt,
+      paths: [...state.sketch.paths], anim: state.sketch.anim,
+      viewBox: [...state.sketch.viewBox],
+    } : null,
     // camera fx settings (NOT the stream)
     cam: {
       track: cam.track, fx: cam.fx,
@@ -7359,6 +7459,25 @@ function applyFullSnapshot(snap){
     if(T.life !== undefined) setSlider('typeLife', T.life*10);
     if(T.density !== undefined) setSlider('typeDens', T.density*100);
     if(T.loop !== undefined){ $('typeLoop').checked = !!T.loop; }
+    if(T.weight !== undefined) setSlider('typeWeight', T.weight);
+    if(T.outlineWidth !== undefined) setSlider('typeOutline', T.outlineWidth*100);
+  }
+  // light mode
+  if(snap.lightMode !== undefined){
+    state.lightMode = !!snap.lightMode;
+    const lm = document.getElementById('lightModeToggle');
+    if(lm) lm.checked = state.lightMode;
+    if(typeof applyLightMode === 'function') applyLightMode();
+  }
+  // sketch (line-art glyph)
+  if(snap.sketch && state.sketch){
+    Object.assign(state.sketch, snap.sketch);
+    const sin = document.getElementById('sketchInput');
+    if(sin) sin.value = snap.sketch.prompt || '';
+    const sh = document.getElementById('sketchHint');
+    if(sh && snap.sketch.enabled && snap.sketch.prompt){
+      sh.textContent = `"${snap.sketch.prompt}" · ${snap.sketch.anim}`;
+    }
   }
   // cam settings
   if(snap.cam){
@@ -7615,7 +7734,170 @@ window._drawImageTop = function(g, dt){
   if(state.modes.typography){
     drawLayerWithKaleido(g, typo.kaleido, (lg) => drawTypography(lg, dt, state.t/1000));
   }
+  // 4) AI line-art sketch — topmost layer
+  if(state.sketch && state.sketch.enabled && state.sketch.paths.length){
+    drawSketch(g, dt);
+  }
 };
+
+// ============================================================
+// AI line-art sketch — Picasso-style glyph drawn over the canvas.
+// Paths come from Claude (parsed JSON) or a small fallback sprite table
+// keyed on common keywords (心臟/heart, 大象/elephant, 魚/fish, 花/flower).
+// ============================================================
+const SKETCH_FALLBACK = {
+  // Picasso-style 1-3 path glyphs in viewBox 200x200
+  '心臟': { paths: ['M 100 70 C 100 50 70 35 55 55 C 35 80 60 110 100 150 C 140 110 165 80 145 55 C 130 35 100 50 100 70 Z'], anim:'pulse' },
+  'heart':{ paths: ['M 100 70 C 100 50 70 35 55 55 C 35 80 60 110 100 150 C 140 110 165 80 145 55 C 130 35 100 50 100 70 Z'], anim:'pulse' },
+  '大象': { paths: [
+    'M 40 130 Q 35 90 65 75 Q 95 60 130 75 Q 160 85 165 115 L 165 150 L 145 150 L 145 130 L 110 130 L 110 150 L 90 150 L 90 132 Q 70 132 50 130 L 50 150 L 35 150 Z',
+    'M 165 115 Q 178 110 175 130 Q 172 145 165 145'
+  ], anim:'breathe' },
+  'elephant': { paths: [
+    'M 40 130 Q 35 90 65 75 Q 95 60 130 75 Q 160 85 165 115 L 165 150 L 145 150 L 145 130 L 110 130 L 110 150 L 90 150 L 90 132 Q 70 132 50 130 L 50 150 L 35 150 Z',
+    'M 165 115 Q 178 110 175 130 Q 172 145 165 145'
+  ], anim:'breathe' },
+  '魚':   { paths: ['M 40 100 Q 90 60 130 100 Q 90 140 40 100 M 130 100 L 165 75 L 160 100 L 165 125 Z M 80 95 A 3 3 0 0 1 80 95.1'], anim:'drift' },
+  'fish': { paths: ['M 40 100 Q 90 60 130 100 Q 90 140 40 100 M 130 100 L 165 75 L 160 100 L 165 125 Z M 80 95 A 3 3 0 0 1 80 95.1'], anim:'drift' },
+  '花':   { paths: [
+    'M 100 100 m -8 -8 a 12 12 0 1 0 16 0 a 12 12 0 1 0 -16 0',
+    'M 100 70 Q 80 80 100 100 Q 120 80 100 70 M 130 100 Q 120 80 100 100 Q 120 120 130 100 M 100 130 Q 120 120 100 100 Q 80 120 100 130 M 70 100 Q 80 120 100 100 Q 80 80 70 100',
+    'M 100 100 L 100 175'
+  ], anim:'breathe' },
+  'flower':{ paths: [
+    'M 100 100 m -8 -8 a 12 12 0 1 0 16 0 a 12 12 0 1 0 -16 0',
+    'M 100 70 Q 80 80 100 100 Q 120 80 100 70 M 130 100 Q 120 80 100 100 Q 120 120 130 100 M 100 130 Q 120 120 100 100 Q 80 120 100 130 M 70 100 Q 80 120 100 100 Q 80 80 70 100',
+    'M 100 100 L 100 175'
+  ], anim:'breathe' },
+};
+
+function drawSketch(g, dt){
+  const s = state.sketch;
+  const [vx,vy,vw,vh] = s.viewBox;
+  // fit-contain into 70% of canvas
+  const scale = Math.min(W, H) * 0.65 / Math.max(vw, vh);
+  const ox = W/2 - vw*scale/2 - vx*scale;
+  const oy = H/2 - vh*scale/2 - vy*scale;
+  const t = state.t * 0.001;
+  // anim transforms
+  let sx = 1, sy = 1, tx = 0, ty = 0, lineWidth = 3.5 * SCALE;
+  if(s.anim === 'pulse'){
+    const beat = (reactor.bass || 0)*0.4 + 0.5 + 0.5*Math.sin(t * 2.5);
+    sx = sy = 1 + beat*0.18;
+    lineWidth = 3.5 * SCALE * (1 + beat*0.4);
+  } else if(s.anim === 'breathe'){
+    const b = 0.5 + 0.5*Math.sin(t * 0.8);
+    sx = sy = 1 + b*0.05;
+  } else if(s.anim === 'drift'){
+    tx = Math.sin(t * 0.4) * W * 0.05;
+    ty = Math.sin(t * 0.6) * H * 0.04;
+  }
+  g.save();
+  g.translate(W/2 + tx, H/2 + ty);
+  g.scale(sx, sy);
+  g.translate(-W/2, -H/2);
+  g.strokeStyle = state.lightMode ? '#0a0a14' : '#f5efe3';
+  g.lineWidth = lineWidth;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  for(const d of s.paths){
+    try {
+      const p = new Path2D();
+      // canvas Path2D supports SVG path data via constructor argument
+      const p2 = new Path2D(d);
+      g.save();
+      g.translate(ox, oy);
+      g.scale(scale, scale);
+      g.stroke(p2);
+      g.restore();
+    } catch(e){
+      // skip malformed paths
+    }
+  }
+  g.restore();
+}
+
+async function generateSketch(prompt){
+  const hint = document.getElementById('sketchHint');
+  prompt = (prompt || '').trim();
+  if(!prompt){
+    state.sketch.enabled = false;
+    state.sketch.paths = [];
+    state.sketch.prompt = '';
+    if(hint) hint.textContent = 'cleared.';
+    return;
+  }
+  // Fallback table first — instant, no network
+  const key = prompt.toLowerCase();
+  const fallback = SKETCH_FALLBACK[prompt] || SKETCH_FALLBACK[key];
+  if(fallback){
+    Object.assign(state.sketch, {
+      enabled: true, prompt, paths: fallback.paths,
+      anim: fallback.anim, viewBox: [0,0,200,200], born: state.t,
+    });
+    if(hint) hint.textContent = `"${prompt}" · ${fallback.anim}`;
+    return;
+  }
+  // No fallback — ask Claude via /api/imagine
+  if(hint) hint.textContent = 'drawing…';
+  const sysPrompt = `You draw line-art glyphs. The user asked for: "${prompt}"
+
+Respond with ONLY a JSON object, no markdown fences, no explanation:
+{
+  "paths": ["M ... L ...", ...],
+  "anim": "pulse" | "breathe" | "drift" | "static",
+  "viewBox": [0, 0, 200, 200]
+}
+
+Rules:
+- 1-3 SVG path "d" strings (M/L/C/Q/Z commands only)
+- viewBox is always [0,0,200,200], glyph centered in it
+- Picasso-style single line drawing — minimal, fluid, evocative
+- Pick anim by subject: pulse for body parts (heart/brain/lung), drift for water/fish/wind, breathe for organic/animals/plants, static for geometric objects
+- Output only the JSON. No prose.`;
+  try {
+    const r = await fetch('/api/imagine', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: sysPrompt }),
+    });
+    if(!r.ok) throw new Error('api ' + r.status);
+    const data = await r.json();
+    let txt = (data.text || '').trim();
+    // strip code fences if Claude added them despite the rule
+    txt = txt.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+    const obj = JSON.parse(txt);
+    if(!obj || !Array.isArray(obj.paths) || !obj.paths.length) throw new Error('no paths');
+    Object.assign(state.sketch, {
+      enabled: true, prompt,
+      paths: obj.paths,
+      anim: ['pulse','breathe','drift','static'].includes(obj.anim) ? obj.anim : 'static',
+      viewBox: Array.isArray(obj.viewBox) && obj.viewBox.length === 4 ? obj.viewBox : [0,0,200,200],
+      born: state.t,
+    });
+    if(hint) hint.textContent = `"${prompt}" · ${state.sketch.anim}`;
+  } catch(err){
+    console.warn('sketch generate failed', err);
+    if(hint) hint.textContent = 'couldn’t draw that — try 心臟 / 大象 / 魚 / 花';
+  }
+}
+
+// Wire UI
+(function wireSketch(){
+  const input = document.getElementById('sketchInput');
+  const btn = document.getElementById('sketchGo');
+  if(!input || !btn) return;
+  btn.addEventListener('click', () => generateSketch(input.value));
+  input.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); generateSketch(input.value); }
+  });
+  document.querySelectorAll('[data-sketch]').forEach(b => {
+    b.addEventListener('click', () => {
+      input.value = b.dataset.sketch;
+      generateSketch(b.dataset.sketch);
+    });
+  });
+})();
 
 /* —————————————————————————————————————————————————————————————————————
    Wire per-layer kaleido controls + Link toggle
