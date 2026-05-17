@@ -1573,6 +1573,7 @@
           </details>
 
           <div style="display:flex;gap:6px;margin-bottom:8px">
+            <button class="audio-btn primary" id="lyricsGo" style="flex:1.4;font-weight:600;letter-spacing:.18em" disabled>▶ GO</button>
             <button class="audio-btn" id="lyricsToggle" style="flex:1">Sync off</button>
             <button class="audio-btn danger" id="lyricsClear" title="Clear loaded lyrics">✕ clear</button>
           </div>
@@ -3586,7 +3587,7 @@ class AudioReactor {
       throw err;
     }
   }
-  useElement(audioEl, labelText){
+  useElement(audioEl, labelText, options){
     this.ensureContext();
     this.stop();
     this.mediaEl = audioEl;
@@ -3598,7 +3599,11 @@ class AudioReactor {
     if(!state.silentOutput){
       this.analyser.connect(this.ac.destination);
     }
-    audioEl.play().catch(e=>console.warn('audio play failed', e));
+    // options.autoPlay defaults to true (back-compat with existing audio file upload).
+    // Set false from lyrics flow so user can confirm both files before pressing GO.
+    if(!options || options.autoPlay !== false){
+      audioEl.play().catch(e=>console.warn('audio play failed', e));
+    }
     this.mode = 'media'; this.label = labelText || 'playing';
   }
   setSilent(silent){
@@ -3761,6 +3766,13 @@ function loadLyricsFromLRC(lrcText, meta){
   lyrics.linesSinceSwitch = 0;
   lyrics.meta = meta || null;
   lyrics.enabled = true;
+  lyrics._lineShowing = false;
+  // Push the FIRST line to the typography canvas right now — confirms the wiring
+  // works without having to play audio. When playback starts, tickLyricsSync will
+  // overwrite with the actual current line based on audio.currentTime.
+  if(typeof _applyLyricToTypo === 'function'){
+    _applyLyricToTypo(lines[0].text);
+  }
   return true;
 }
 
@@ -7608,19 +7620,21 @@ if(state.silentOutput){
     return s;
   }
 
-  // ── Music file upload ──
+  // ── Music file upload ── load WITHOUT auto-play so user can confirm both files
+  // before pressing GO. AudioReactor's media element is set up, just paused.
   musicInput && musicInput.addEventListener('change', (e) => {
     const f = e.target.files && e.target.files[0]; if(!f) return;
     const a = new Audio(URL.createObjectURL(f));
     a.loop = true;
-    if(typeof reactor !== 'undefined') reactor.useElement(a, f.name);
-    if(typeof setAudioStatus === 'function') setAudioStatus(f.name.length>22 ? f.name.slice(0,20)+'…' : f.name, true);
+    if(typeof reactor !== 'undefined') reactor.useElement(a, f.name, { autoPlay: false });
+    if(typeof setAudioStatus === 'function') setAudioStatus((f.name.length>22 ? f.name.slice(0,20)+'…' : f.name) + ' · ready', true);
     _loadedMusic = { name: f.name, file: f };
     if(musicLabel) musicLabel.textContent = '♪ ' + (f.name.length>20 ? f.name.slice(0,18)+'…' : f.name);
     // Pre-fill the search box from filename — gives LRClib a head start
     const guess = parseFilename(f.name);
     if(guess && !searchEl.value.trim()) searchEl.value = guess;
     fullStatus();
+    updateGoBtn();
   });
 
   // ── LRC file upload ──
@@ -7631,13 +7645,14 @@ if(state.silentOutput){
     if(ok){
       _loadedLrc = true;
       if(lrcLabel) lrcLabel.textContent = '📝 ' + (f.name.length>20 ? f.name.slice(0,18)+'…' : f.name);
-      // Auto-enable sync now that we have lyrics (only if music is also loaded)
-      if(_loadedMusic) lyrics.enabled = true;
+      // loadLyricsFromLRC sets lyrics.enabled = true automatically. Sync stays armed
+      // — it just waits for audio.currentTime to actually advance (press GO to play).
       setToggleLabel();
       fullStatus();
     } else {
       setStatus('could not parse .lrc — expected [mm:ss.xx]text format');
     }
+    if(typeof updateGoBtn === 'function') updateGoBtn();
   });
 
   // ── LRClib search ──
@@ -7720,7 +7735,60 @@ if(state.silentOutput){
     clearAlternates();
     setToggleLabel();
     fullStatus();
+    // Stop and reset audio if playing
+    if(typeof reactor !== 'undefined' && reactor.mediaEl){
+      try { reactor.mediaEl.pause(); reactor.mediaEl.currentTime = 0; } catch(_){}
+    }
+    updateGoBtn();
   });
+
+  // ── GO button: master play/pause for the synced music+lyrics session ──
+  const goBtn = document.getElementById('lyricsGo');
+  function updateGoBtn(){
+    if(!goBtn) return;
+    const hasMusic = !!_loadedMusic;
+    const hasLyrics = _loadedLrc && lyrics.lines.length > 0;
+    const playing = typeof reactor !== 'undefined' && reactor.mediaEl && !reactor.mediaEl.paused;
+    goBtn.disabled = !hasMusic;  // music alone is enough to play (without lyrics)
+    if(!hasMusic){
+      goBtn.textContent = '▶ GO  ·  upload music first';
+    } else if(!hasLyrics){
+      goBtn.textContent = playing ? '⏸ STOP  ·  (no lyrics)' : '▶ GO  ·  music only';
+    } else {
+      goBtn.textContent = playing ? '⏸ STOP' : '▶ GO  ·  start synced playback';
+    }
+  }
+  goBtn && goBtn.addEventListener('click', () => {
+    if(!reactor || !reactor.mediaEl){ setStatus('upload a music file first'); return; }
+    const el = reactor.mediaEl;
+    if(el.paused){
+      // Reset to beginning if at end (avoid double-trigger of first line)
+      if(el.ended || el.currentTime >= el.duration - 0.1) el.currentTime = 0;
+      // Auto-enable sync if lyrics are loaded
+      if(_loadedLrc && lyrics.lines.length > 0) lyrics.enabled = true;
+      // Reset showing-state so first line fires
+      lyrics.currentIdx = -1;
+      lyrics._lineShowing = false;
+      el.play().then(() => {
+        console.log('[IW] playback started at', el.currentTime.toFixed(2));
+        updateGoBtn();
+        setToggleLabel();
+      }).catch(err => {
+        console.error('[IW] play() rejected:', err);
+        setStatus('browser blocked audio playback — click GO again');
+      });
+    } else {
+      el.pause();
+      updateGoBtn();
+    }
+  });
+
+  // Reflect state when audio events happen (e.g., natural end of file)
+  if(typeof reactor !== 'undefined'){
+    const updatePeriodically = () => { updateGoBtn(); setTimeout(updatePeriodically, 500); };
+    updatePeriodically();
+  }
+  updateGoBtn();
 
   // Sliders
   function wireLyricsSlider(inputId, fillId, thumbId, valId, key, fmt, transform){
@@ -9082,7 +9150,12 @@ function pickSizeFromMode(){
    Wire typography controls
    ————————————————————————————————————————————————————————————————————— */
 const typeText = $('typeText');
-typeText.addEventListener('input', () => { typo.text = typeText.value; });
+typeText.addEventListener('input', () => {
+  // Don't let manual edits overwrite lyric text while sync is active —
+  // the lyrics system needs typo.text to stay as the current line.
+  if(typeof lyrics !== 'undefined' && lyrics.enabled) return;
+  typo.text = typeText.value;
+});
 typo.text = typeText.value;
 
 $$('#typeFamilySeg button').forEach(b => b.addEventListener('click', () => {
