@@ -1861,7 +1861,18 @@ return {
 <script>
 /* ============================================================
    INNER WEATHER — a generative emotional field
+   Build marker: 2026-05-17b — gate delegation + FAB delegation
    ============================================================ */
+
+// Global error catcher — anything that breaks silently will print here.
+// Open DevTools Console (F12) to see [IW] messages.
+window.addEventListener('error', (e) => {
+  console.error('[IW] uncaught error:', e.message, '@', (e.filename||'').split('/').pop(), 'L' + (e.lineno||'?'));
+});
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
+});
+console.log('[IW] script booting · build 2026-05-17b');
 
 const EMOTIONS = [
   { id:"love",      name:"Love",      whisper:"warm & expanding",   hue:[348, 18],  sat:80, light:64, glow:"#ffb6c1", style:"bloom"    },
