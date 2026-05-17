@@ -221,6 +221,48 @@
     transition: color .15s;
   }
   .gate-back:hover{ color:#c87cff; opacity:1; }
+  .gate-switch{
+    text-align:center; font-size:11px; color:var(--ink-soft); opacity:.7;
+    margin-top:8px; font-family:var(--sans);
+  }
+  .gate-switch a{ color:#c87cff; text-decoration:none; }
+  .gate-switch a:hover{ text-decoration:underline; }
+  .gate-err{
+    background:rgba(255,80,110,.10); border:1px solid rgba(255,80,110,.35);
+    color:#ffadc0; padding:8px 10px; border-radius:7px;
+    font-size:11px; margin-bottom:10px; font-family:var(--sans);
+  }
+
+  /* Top-right user indicator */
+  .user-chip{
+    position:fixed; right:18px; top:14px; z-index:5;
+    display:flex; align-items:center; gap:10px;
+    background:rgba(8,8,14,.6); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,.08); border-radius:999px;
+    padding:5px 6px 5px 14px; font-family:var(--sans);
+    transition: background .15s, border-color .15s;
+  }
+  .user-chip:hover{ background:rgba(8,8,14,.85); border-color:rgba(255,255,255,.18); }
+  .user-chip.hidden{ display:none; }
+  .user-chip .ava{
+    width:24px; height:24px; border-radius:50%;
+    background:linear-gradient(135deg,#c87cff,#7fdcff);
+    color:#0e0c16; display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700;
+  }
+  .user-chip .ava.admin{ background:linear-gradient(135deg,#ffcc22,#ff7a5a); }
+  .user-chip .meta{ display:flex; flex-direction:column; line-height:1.1; }
+  .user-chip .name{ font-size:11.5px; color:var(--ink); font-weight:500; }
+  .user-chip .role{ font-size:9.5px; color:var(--ink-soft); opacity:.7; letter-spacing:.06em; }
+  .user-chip .logout{
+    appearance:none; border:1px solid rgba(255,255,255,.10);
+    background:rgba(255,255,255,.04); color:var(--ink-soft);
+    width:24px; height:24px; border-radius:50%;
+    font-size:11px; cursor:pointer; margin-left:4px;
+    display:flex; align-items:center; justify-content:center;
+    transition: background .12s, color .12s;
+  }
+  .user-chip .logout:hover{ background:rgba(255,80,110,.18); color:#ffadc0; }
 
   /* Preview-mode CTA — small chip pinned top-center when user is browsing as guest */
   .preview-cta{
@@ -788,10 +830,10 @@
       </div>
     </div>
 
-    <!-- Stage 2: Register / Sign-in (hidden initially) -->
+    <!-- Stage 2a: Register (new user, hidden initially) -->
     <div class="gate-card" id="gateRegister" style="display:none">
       <div class="gate-title">Inner Weather</div>
-      <div class="gate-subtitle">enter your details · 註冊或登入</div>
+      <div class="gate-subtitle">create your account · 註冊新帳號</div>
       <form id="gateForm" autocomplete="off">
         <div class="gate-field">
           <label for="gateName">Name · 姓名</label>
@@ -799,18 +841,46 @@
         </div>
         <div class="gate-field">
           <label for="gateEmail">Email</label>
-          <input id="gateEmail" type="email" required maxlength="120" />
+          <input id="gateEmail" type="email" required maxlength="120" autocomplete="email" />
         </div>
         <div class="gate-field">
           <label for="gateRole">Profession · 職業</label>
           <input id="gateRole" type="text" required maxlength="80" />
         </div>
-        <button class="gate-submit" type="submit">Enter the field</button>
+        <div class="gate-field">
+          <label for="gatePassword">Password · 密碼 <span style="opacity:.5;text-transform:none;letter-spacing:0;font-style:italic">(min 6 chars)</span></label>
+          <input id="gatePassword" type="password" required minlength="6" maxlength="120" autocomplete="new-password" />
+        </div>
+        <div class="gate-err" id="gateErr" style="display:none"></div>
+        <button class="gate-submit" type="submit">Create account</button>
       </form>
       <div class="gate-back" id="gateBackBtn">← back to welcome</div>
+      <div class="gate-switch">already have an account? <a href="#" id="gateSwitchLogin">sign in</a></div>
       <div class="gate-foot">
-        Already registered? Use the same email — your license is recovered automatically.<br>
-        <span style="opacity:.7">Your info stays on this device. Nothing else leaves your browser.</span>
+        <span style="opacity:.7">Account data stored locally on this device. Password is hashed (SHA-256). No cloud sync yet — different device = re-register.</span>
+      </div>
+    </div>
+
+    <!-- Stage 2b: Login (returning user, hidden initially) -->
+    <div class="gate-card" id="gateLogin" style="display:none">
+      <div class="gate-title">Welcome back</div>
+      <div class="gate-subtitle" id="gateLoginSubtitle">sign in · 登入</div>
+      <form id="gateLoginForm" autocomplete="off">
+        <div class="gate-field">
+          <label for="gateLoginEmail">Email</label>
+          <input id="gateLoginEmail" type="email" required maxlength="120" autocomplete="email" />
+        </div>
+        <div class="gate-field">
+          <label for="gateLoginPassword">Password · 密碼</label>
+          <input id="gateLoginPassword" type="password" required minlength="6" maxlength="120" autocomplete="current-password" />
+        </div>
+        <div class="gate-err" id="gateLoginErr" style="display:none"></div>
+        <button class="gate-submit" type="submit">Sign in</button>
+      </form>
+      <div class="gate-back" id="gateLoginBackBtn">← back to welcome</div>
+      <div class="gate-switch">no account yet? <a href="#" id="gateSwitchRegister">create one</a></div>
+      <div class="gate-foot">
+        <span style="opacity:.7">Forgot password? Account data is local to this browser — clear it &amp; re-register, or contact <a href="mailto:ai.allen.task@gmail.com" style="color:#c87cff">ai.allen.task@gmail.com</a>.</span>
       </div>
     </div>
 
@@ -824,6 +894,16 @@
   <button class="preview-cta hidden" id="previewCta" type="button">
     <span class="glyph">●</span><span>preview mode · register for full access</span>
   </button>
+
+  <!-- User chip — top right, shows current logged-in user + logout -->
+  <div class="user-chip hidden" id="userChip" title="Logged in">
+    <div class="ava" id="userAva">?</div>
+    <div class="meta">
+      <span class="name" id="userName">—</span>
+      <span class="role" id="userRole">—</span>
+    </div>
+    <button class="logout" id="userLogout" type="button" title="Sign out">⏻</button>
+  </div>
 
   <!-- Author footer — © Allen Hong + IG link -->
   <div class="author-foot">
@@ -6292,26 +6372,38 @@ document.querySelectorAll('.lock-chip').forEach(chip => {
 // if yes, sets state.noWatermark so saves/recordings come out clean.
 // Projection windows (?silent=1) automatically skip since the operator already registered
 // in the same browser (shared localStorage).
-const GATE_KEY = 'iw-user-v1';
-const LICENSE_KEY = 'iw-license-v1';
+const GATE_KEY    = 'iw-user-v1';     // legacy cache of the logged-in user
+const LICENSE_KEY = 'iw-license-v1';  // legacy cache of license probe result
+const TOKEN_KEY   = 'iw-token-v1';    // server-side session token (HMAC-signed by Vercel function)
 
-async function checkLicense(email){
+function getToken(){
+  try { return localStorage.getItem(TOKEN_KEY) || null; } catch(_){ return null; }
+}
+function setToken(t){
+  try { localStorage.setItem(TOKEN_KEY, t); } catch(_){}
+}
+function clearToken(){
+  try { localStorage.removeItem(TOKEN_KEY); } catch(_){}
+}
+
+// Generic authed fetch — attaches Bearer token, parses JSON.
+async function apiFetch(path, body){
+  const headers = { 'content-type': 'application/json' };
+  const tok = getToken();
+  if(tok) headers['authorization'] = 'Bearer ' + tok;
   try {
-    const r = await fetch('/api/license-check', {
-      method:'POST',
-      headers:{ 'content-type':'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    if(!r.ok) return null;
-    return await r.json();
-  } catch(_){ return null; }
+    const r = await fetch(path, { method:'POST', headers, body: JSON.stringify(body || {}) });
+    const data = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data };
+  } catch(err){
+    return { ok:false, status: 0, data: { error: String(err && err.message || err) } };
+  }
 }
 
 function applyLicense(lic){
   if(lic && lic.licensed){
     state.noWatermark = true;
-    state.licenseInfo = { email: lic.email, name: lic.name, admin: !!lic.admin, expires: lic.expires };
-    try { localStorage.setItem(LICENSE_KEY, JSON.stringify(lic)); } catch(_){}
+    state.licenseInfo = { email: lic.email, name: lic.name, admin: !!lic.admin };
   } else {
     state.noWatermark = false;
     state.licenseInfo = null;
@@ -6319,8 +6411,6 @@ function applyLicense(lic){
 }
 
 // state.previewMode = true when user clicked "Try preview" without registering.
-// In preview mode the global click-interceptor blocks anything other than Random,
-// Reset, and the lock chips → those clicks open the register modal instead.
 state.previewMode = false;
 
 function getRegisteredUser(){
@@ -6331,150 +6421,316 @@ function getRegisteredUser(){
   return null;
 }
 
+// Local password hashing (SHA-256 + random salt). Local-only — protects only
+// against casual access on this device; not a server-grade auth.
+async function hashPassword(pw, salt){
+  const enc = new TextEncoder();
+  const data = enc.encode(salt + ':' + pw);
+  const buf  = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+function randomSalt(){
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
 (function setupGate(){
-  const overlay   = document.getElementById('gateOverlay');
-  const welcome   = document.getElementById('gateWelcome');
-  const register  = document.getElementById('gateRegister');
-  const form      = document.getElementById('gateForm');
-  const tryBtn    = document.getElementById('gateTryBtn');
-  const regBtn    = document.getElementById('gateRegisterBtn');
-  const backBtn   = document.getElementById('gateBackBtn');
+  const overlay    = document.getElementById('gateOverlay');
+  const welcome    = document.getElementById('gateWelcome');
+  const register   = document.getElementById('gateRegister');
+  const login      = document.getElementById('gateLogin');
+  const form       = document.getElementById('gateForm');
+  const loginForm  = document.getElementById('gateLoginForm');
+  const tryBtn     = document.getElementById('gateTryBtn');
+  const regBtn     = document.getElementById('gateRegisterBtn');
+  const backBtn    = document.getElementById('gateBackBtn');
+  const loginBack  = document.getElementById('gateLoginBackBtn');
+  const switchLogin    = document.getElementById('gateSwitchLogin');
+  const switchRegister = document.getElementById('gateSwitchRegister');
   const previewCta = document.getElementById('previewCta');
   if(!overlay || !form) return;
 
-  function showWelcome(){
-    welcome.style.display  = '';
+  function hideAllViews(){
+    welcome.style.display  = 'none';
     register.style.display = 'none';
+    login.style.display    = 'none';
+  }
+  function showWelcome(){
+    hideAllViews();
+    welcome.style.display = '';
     overlay.classList.remove('hidden');
   }
   function showRegister(){
-    welcome.style.display  = 'none';
+    hideAllViews();
     register.style.display = '';
     overlay.classList.remove('hidden');
     setTimeout(() => document.getElementById('gateName').focus(), 80);
-    // Pre-fill if we have any partial user data already
     const existing = getRegisteredUser();
     if(existing){
       document.getElementById('gateName').value  = existing.name  || '';
       document.getElementById('gateEmail').value = existing.email || '';
       document.getElementById('gateRole').value  = existing.role  || '';
     }
+    document.getElementById('gateErr').style.display = 'none';
+  }
+  function showLogin(prefillEmail){
+    hideAllViews();
+    login.style.display = '';
+    overlay.classList.remove('hidden');
+    document.getElementById('gateLoginErr').style.display = 'none';
+    const existing = getRegisteredUser();
+    document.getElementById('gateLoginEmail').value = prefillEmail || (existing && existing.email) || '';
+    document.getElementById('gateLoginPassword').value = '';
+    const sub = document.getElementById('gateLoginSubtitle');
+    if(sub && existing) sub.textContent = `signed in as ${existing.name}? · 登入回來`;
+    setTimeout(() => document.getElementById('gateLoginPassword').focus(), 80);
   }
   function hideGate(){ overlay.classList.add('hidden'); }
-
-  // Initial decision
-  const isProjection = new URLSearchParams(location.search).has('silent');
-  const existing = getRegisteredUser();
-  if(isProjection){
-    hideGate();
-  } else if(existing){
-    // returning user → straight in, then refresh license in background
-    hideGate();
-    try {
-      const cached = JSON.parse(localStorage.getItem(LICENSE_KEY) || 'null');
-      if(cached && cached.expires && cached.expires > Date.now()) applyLicense(cached);
-    } catch(_){}
-    checkLicense(existing.email).then(lic => { if(lic) applyLicense(lic); });
-  } else {
-    showWelcome();
+  function showErr(elId, msg){
+    const el = document.getElementById(elId);
+    if(el){ el.textContent = msg; el.style.display = ''; }
   }
 
-  // Stage-1 buttons
+  // ——— Initial routing ———
+  // 1. Projection windows skip everything.
+  // 2. If we have a server token → verify via /api/auth/me; valid → hide gate.
+  //    Invalid/expired → token cleared, show welcome.
+  // 3. No token but legacy local user → show login pre-filled.
+  // 4. Nothing → welcome.
+  const isProjection = new URLSearchParams(location.search).has('silent');
+  const existing = getRegisteredUser();
+
+  async function bootstrapSession(){
+    if(isProjection){
+      hideGate();
+      if(existing) applyUserChip(existing);
+      return;
+    }
+    const tok = getToken();
+    if(tok){
+      const res = await apiFetch('/api/auth/me');
+      if(res.ok && res.data.user){
+        applyUserChip(res.data.user);
+        applyLicense({ ...res.data.user, licensed: res.data.user.licensed });
+        // Update local cache
+        try { localStorage.setItem(GATE_KEY, JSON.stringify({ ...res.data.user, registeredAt: existing ? existing.registeredAt : Date.now() })); } catch(_){}
+        hideGate();
+        return;
+      }
+      // token bad → wipe and fall through
+      clearToken();
+    }
+    // No token. If we have legacy local data → show login (returning user feel).
+    if(existing){
+      showLogin(existing.email);
+    } else {
+      showWelcome();
+    }
+  }
+  bootstrapSession();
+
+  // ——— Stage-1 buttons ———
   if(tryBtn) tryBtn.addEventListener('click', () => {
     state.previewMode = true;
     hideGate();
     if(previewCta) previewCta.classList.remove('hidden');
   });
-  if(regBtn) regBtn.addEventListener('click', () => { showRegister(); });
+  if(regBtn) regBtn.addEventListener('click', () => {
+    // If a user already exists locally → default to login. Otherwise register.
+    const ex = getRegisteredUser();
+    if(ex) showLogin(); else showRegister();
+  });
   if(backBtn) backBtn.addEventListener('click', () => { showWelcome(); });
-
-  // Preview-mode CTA → open register modal
-  if(previewCta) previewCta.addEventListener('click', () => { showRegister(); });
-
-  // Form submit — synchronous hide so UI feels instant, license check runs in background.
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const name  = document.getElementById('gateName').value.trim();
-    const email = document.getElementById('gateEmail').value.trim();
-    const role  = document.getElementById('gateRole').value.trim();
-    if(!name || !email || !role) return;
-    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return;
-    try {
-      localStorage.setItem(GATE_KEY, JSON.stringify({
-        name, email, role, registeredAt: Date.now(),
-      }));
-    } catch(_){}
-    state.previewMode = false;
-    if(previewCta) previewCta.classList.add('hidden');
-    hideGate();
-    // Background license check — sets noWatermark if email is whitelisted
-    checkLicense(email).then(lic => { if(lic) applyLicense(lic); });
+  if(loginBack) loginBack.addEventListener('click', () => { showWelcome(); });
+  if(switchLogin) switchLogin.addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
+  if(switchRegister) switchRegister.addEventListener('click', (e) => { e.preventDefault(); showRegister(); });
+  if(previewCta) previewCta.addEventListener('click', () => {
+    const ex = getRegisteredUser();
+    if(ex) showLogin(); else showRegister();
   });
 
-  // Expose for the interceptor below
-  window._openRegisterGate = showRegister;
+  function setBtnLoading(btnEl, loading, originalText){
+    if(!btnEl) return;
+    if(loading){
+      btnEl._origText = btnEl.textContent;
+      btnEl.disabled = true;
+      btnEl.textContent = originalText || '…';
+    } else {
+      btnEl.disabled = false;
+      if(btnEl._origText) btnEl.textContent = btnEl._origText;
+    }
+  }
+
+  // ——— Register submit → POST /api/auth/register ———
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submit = form.querySelector('button[type="submit"]');
+    const name  = document.getElementById('gateName').value.trim();
+    const email = document.getElementById('gateEmail').value.trim().toLowerCase();
+    const role  = document.getElementById('gateRole').value.trim();
+    const pw    = document.getElementById('gatePassword').value;
+    if(!name || !email || !role || !pw){ showErr('gateErr', 'fill in every field.'); return; }
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ showErr('gateErr', 'invalid email format.'); return; }
+    if(pw.length < 6){ showErr('gateErr', 'password must be at least 6 characters.'); return; }
+
+    setBtnLoading(submit, true, 'creating…');
+    const res = await apiFetch('/api/auth/register', { name, email, role, password: pw });
+    setBtnLoading(submit, false);
+
+    if(!res.ok){
+      if(res.data.code === 'exists'){
+        // Account exists on server — pivot to login with this email + the password they just typed
+        showLogin(email);
+        // also pre-fill password for the immediate login attempt
+        document.getElementById('gateLoginPassword').value = pw;
+        showErr('gateLoginErr', 'account exists — try signing in with this password.');
+        return;
+      }
+      showErr('gateErr', res.data.error || ('server error · ' + res.status));
+      return;
+    }
+    setToken(res.data.token);
+    try { localStorage.setItem(GATE_KEY, JSON.stringify({ ...res.data.user, registeredAt: Date.now() })); } catch(_){}
+    state.previewMode = false;
+    if(previewCta) previewCta.classList.add('hidden');
+    applyUserChip(res.data.user);
+    applyLicense(res.data.user);
+    hideGate();
+  });
+
+  // ——— Login submit → POST /api/auth/login (auto-register on 404 if local data exists) ———
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submit = loginForm.querySelector('button[type="submit"]');
+    const email = document.getElementById('gateLoginEmail').value.trim().toLowerCase();
+    const pw    = document.getElementById('gateLoginPassword').value;
+    if(!email || !pw){ showErr('gateLoginErr', 'enter email and password.'); return; }
+
+    setBtnLoading(submit, true, 'signing in…');
+    let res = await apiFetch('/api/auth/login', { email, password: pw });
+
+    // Auto-migrate path: server has no account, but we have legacy local data — register quietly.
+    if(!res.ok && res.data && res.data.code === 'no_user'){
+      const ex = getRegisteredUser();
+      if(ex && ex.email && ex.email.toLowerCase() === email && ex.name && ex.role){
+        // Recreate the account on the server using their already-typed password.
+        const reg = await apiFetch('/api/auth/register', {
+          name: ex.name, email, role: ex.role, password: pw,
+        });
+        if(reg.ok){ res = reg; }
+      }
+    }
+    setBtnLoading(submit, false);
+
+    if(!res.ok){
+      const msg = res.status === 401 ? 'wrong password.'
+                : res.status === 404 ? 'no account for this email — register first.'
+                : (res.data && res.data.error) || ('server error · ' + res.status);
+      showErr('gateLoginErr', msg);
+      if(res.status === 404){ setTimeout(() => showRegister(), 1400); }
+      return;
+    }
+    setToken(res.data.token);
+    try { localStorage.setItem(GATE_KEY, JSON.stringify({ ...res.data.user, registeredAt: Date.now() })); } catch(_){}
+    state.previewMode = false;
+    if(previewCta) previewCta.classList.add('hidden');
+    applyUserChip(res.data.user);
+    applyLicense(res.data.user);
+    hideGate();
+  });
+
+  // ——— Expose for the interceptor + previewCta ———
+  window._openRegisterGate = () => {
+    const ex = getRegisteredUser();
+    if(ex) showLogin(); else showRegister();
+  };
 })();
 
-// Preview-mode click interceptor — gates everything except Random / Reset / lock chips.
-// Capture-phase listener so we intercept before downstream handlers run.
+// ——— User chip top-right ———
+function applyUserChip(user){
+  const chip = document.getElementById('userChip');
+  if(!chip || !user) return;
+  const ava = document.getElementById('userAva');
+  const name = document.getElementById('userName');
+  const role = document.getElementById('userRole');
+  const initials = (user.name || '?').trim().slice(0,1).toUpperCase();
+  const isAdmin = (user.email || '').toLowerCase() === 'ai.allen.task@gmail.com';
+  if(ava){ ava.textContent = initials; ava.classList.toggle('admin', isAdmin); }
+  if(name) name.textContent = user.name + (isAdmin ? ' · admin' : '');
+  if(role) role.textContent = user.role || '';
+  chip.classList.remove('hidden');
+}
+function clearUserChip(){
+  const chip = document.getElementById('userChip');
+  if(chip) chip.classList.add('hidden');
+}
+// Wire logout
+(function(){
+  const btn = document.getElementById('userLogout');
+  if(!btn) return;
+  btn.addEventListener('click', () => {
+    if(!confirm('Sign out? You can sign back in with the same email + password.')) return;
+    clearToken();
+    try { localStorage.removeItem(LICENSE_KEY); } catch(_){}
+    // keep iw-user-v1 as a hint for the login screen (email prefill)
+    state.noWatermark = false;
+    state.licenseInfo = null;
+    clearUserChip();
+    location.reload();
+  });
+})();
+
+// Preview-mode click interceptor — capture-phase. Only blocks USER events
+// (e.isTrusted) inside the side panel that aren't on the explicit allowlist.
+// Anything outside the panel (canvas, FAB buttons including Present, footer,
+// hotkey help) stays free in preview mode.
 (function setupPreviewInterceptor(){
-  // Allowlist: things the preview user CAN click without being kicked to register.
-  // Identified by element id, class, or closest ancestor matching these.
-  const ALLOW_IDS = new Set([
-    'qaRandomTop', 'qaResetTop', 'randTop', 'randomize', 'reset',
-    'gateOverlay', 'gateWelcome', 'gateRegister', 'gateForm',
-    'gateTryBtn', 'gateRegisterBtn', 'gateBackBtn', 'gateName', 'gateEmail', 'gateRole',
-    'previewCta',
-    'fab', 'closePanel',           // panel open/close OK
-    'hotkeyToggleBtn',
-  ]);
-  const ALLOW_SELECTORS = [
-    '.lock-chip',
-    '.author-foot',
-    '#hotkeyHelp',
-    '.gate-overlay',
+  // Inside the panel, ONLY these may be touched while in preview:
+  const PANEL_ALLOW_SELECTORS = [
+    '#qaRandomTop',          // Random
+    '#qaResetTop',            // Reset
+    '#randTop',               // top-bar dice
+    '.lock-chip',             // lock toggles
+    '#closePanel',            // close panel button
+    '#gateOverlay',           // the gate itself (form inputs etc.)
+    '.gate-overlay *',
   ];
 
-  function isAllowed(el){
-    if(!el || el.nodeType !== 1) return true;  // text node etc.
-    let cur = el;
-    while(cur && cur !== document.body){
-      if(cur.id && ALLOW_IDS.has(cur.id)) return true;
-      for(const sel of ALLOW_SELECTORS){
-        if(cur.matches && cur.matches(sel)) return true;
-      }
-      cur = cur.parentElement;
+  function isAllowedInPanel(el){
+    if(!el || !el.closest) return false;
+    for(const sel of PANEL_ALLOW_SELECTORS){
+      if(el.closest(sel)) return true;
     }
     return false;
   }
 
   function gateBlock(e){
     if(!state.previewMode) return;
-    if(isAllowed(e.target)) return;
-    // Only intercept interactive events
-    const t = e.target;
-    const tag = (t.tagName || '').toLowerCase();
-    const isInteractive = ['button','input','select','textarea','a','label'].includes(tag)
-      || (t.closest && t.closest('button, input, select, textarea, a, label, .mode-chip, .preset, .phrase-chip, [data-preset], [data-mode]'));
-    if(!isInteractive) return;
+    if(!e.isTrusted) return;   // ignore programmatic events (syncAllUI dispatches input on sliders)
+    const panel = document.getElementById('panel');
+    // Outside the panel → totally free (Present button, canvas, footer, FAB, HUD)
+    if(!panel || !panel.contains(e.target)) return;
+    // Inside the panel → must be on the explicit allowlist
+    if(isAllowedInPanel(e.target)) return;
     e.preventDefault();
     e.stopPropagation();
     if(typeof window._openRegisterGate === 'function') window._openRegisterGate();
   }
-  // capture phase so we run BEFORE the element's own listener
+
   document.addEventListener('click', gateBlock, true);
   document.addEventListener('input', gateBlock, true);
   document.addEventListener('change', gateBlock, true);
+
   document.addEventListener('keydown', (e) => {
-    // Allow only specific keys in preview: R (random), X (reset), space (blackout), ?, P
     if(!state.previewMode) return;
+    if(!e.isTrusted) return;
     const tgt = e.target;
     if(tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)){
-      // typing in the gate form itself — allow
-      return;
+      return;  // typing in gate inputs is fine
     }
     const k = (e.key || '').toLowerCase();
-    const allowKeys = ['r','x',' ','?','/','p','escape','f'];
+    const allowKeys = ['r','x',' ','?','/','p','escape','f','t'];
     if(allowKeys.includes(k)) return;
     e.preventDefault(); e.stopPropagation();
     if(typeof window._openRegisterGate === 'function') window._openRegisterGate();
