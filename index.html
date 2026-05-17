@@ -1547,18 +1547,36 @@
         </div>
 
         <div class="section">
-          <h3 class="section-title">Lyrics sync <em style="font-size:11px;color:var(--ink-faint);font-style:normal;letter-spacing:.12em;text-transform:uppercase;margin-left:6px">歌詞 · auto-fetch + visual mapping</em></h3>
-          <div style="display:flex;gap:6px;align-items:stretch;margin-bottom:6px">
-            <input id="lyricsSearch" type="text" placeholder="song title — artist (e.g. fly me to the moon — frank sinatra)"
-                   style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--ink);border-radius:7px;padding:8px 10px;font-family:var(--sans);font-size:12px;outline:none" />
-            <button class="audio-btn" id="lyricsFetch">Fetch</button>
+          <h3 class="section-title">Music + Lyrics <em style="font-size:11px;color:var(--ink-faint);font-style:normal;letter-spacing:.12em;text-transform:uppercase;margin-left:6px">音樂與歌詞 · 一起上傳</em></h3>
+          <!-- Combined upload: music file + lyrics file in the same row.
+               Lyrics line driving uses whatever style the user picked in the Type tab. -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+            <label class="audio-btn" style="text-align:center;cursor:pointer">
+              <span id="lyricsMusicLabel">♪ Music file…</span>
+              <input id="lyricsMusicInput" type="file" accept="audio/*" style="display:none" />
+            </label>
+            <label class="audio-btn" style="text-align:center;cursor:pointer">
+              <span id="lyricsLrcLabel">📝 .lrc file…</span>
+              <input id="lyricsLrcInput" type="file" accept=".lrc,.txt" style="display:none" />
+            </label>
           </div>
+          <div class="audio-note" id="lyricsStatus" style="margin-bottom:8px">no music / lyrics loaded</div>
+
+          <details style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:8px 10px;margin-bottom:8px">
+            <summary style="cursor:pointer;font-family:var(--sans);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)">No .lrc? · search LRClib</summary>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <input id="lyricsSearch" type="text" placeholder="title — artist  (e.g. fly me to the moon — sinatra)"
+                     style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--ink);border-radius:7px;padding:8px 10px;font-family:var(--sans);font-size:12px;outline:none" />
+              <button class="audio-btn" id="lyricsFetch">Fetch</button>
+            </div>
+            <div id="lyricsAlternates" style="margin-top:6px;display:flex;flex-direction:column;gap:3px"></div>
+          </details>
+
           <div style="display:flex;gap:6px;margin-bottom:8px">
-            <button class="audio-btn" id="lyricsToggle" style="flex:1">Off</button>
-            <button class="audio-btn" id="lyricsPaste" title="Paste LRC manually">Paste LRC</button>
-            <button class="audio-btn danger" id="lyricsClear" title="Clear loaded lyrics">✕</button>
+            <button class="audio-btn" id="lyricsToggle" style="flex:1">Sync off</button>
+            <button class="audio-btn danger" id="lyricsClear" title="Clear loaded lyrics">✕ clear</button>
           </div>
-          <div class="audio-note" id="lyricsStatus" style="margin-bottom:6px">no lyrics loaded</div>
+
           <div class="ctrl"><span class="label">Fallback: switch every N lines</span><span class="val" id="lyricsEveryVal">5</span>
             <div class="slider"><div class="track"></div><div class="fill" id="lyricsEveryFill"></div><div class="thumb" id="lyricsEveryThumb"></div>
               <input type="range" min="2" max="12" value="5" id="lyricsEvery" />
@@ -1575,9 +1593,9 @@
             </div>
           </div>
           <div class="type-tip" style="margin-top:4px">
-            Auto-fetches synced lyrics, shows them as typography, and switches the visual
-            on <strong>verse → chorus → bridge transitions</strong> (detected by repeated lines).
-            Fallback timer above kicks in only if a section runs long without a transition.
+            <strong>Upload both music and .lrc together</strong> for guaranteed sync. Lyrics appear
+            using <strong>your current Type tab style</strong> (animation / font / color / weight).
+            Visual switches on <strong>verse ↔ chorus</strong> transitions (detected by repeated lines).
             Instrumental gaps trigger faster switches.
           </div>
         </div>
@@ -3742,6 +3760,32 @@ function clearLyrics(){
   lyrics.currentSection = null;
 }
 
+// Drive the existing Typography system with one lyric line.
+// Respects the user's Type tab choices (anim, style, color, weight, font, kaleido).
+// Disables auto-spawn so lines don't stack across timings.
+function _applyLyricToTypo(text){
+  if(typeof typo === 'undefined') return;
+  // Phrase pool = just this line (used by spawn-based anims)
+  typo.text = text || '';
+  // morphCenter / typewriter — drive center text directly, never auto-swap
+  typo.centerCurrent = text;
+  typo.centerSwapT = (state.t/1000) + 999999;
+  typo._tw = null;  // reset typewriter so it re-starts on new line
+  // Clear stacked spawns so a long line doesn't pile up on a short one
+  if(Array.isArray(typo.spawns)) typo.spawns.length = 0;
+  typo.spawnAcc = 0;
+  // For spawn-based anims, drop ONE word with the new text using the user's style
+  if(typeof spawnWord === 'function'){
+    try { spawnWord(text); } catch(_){}
+  }
+  // Force typography mode on so the line is visible
+  if(!state.modes.typography){
+    state.modes.typography = true;
+    const cb = document.querySelector('#modes input[data-mode="typography"]');
+    if(cb) cb.checked = true;
+  }
+}
+
 // Called from the main frame loop. Reads audio.currentTime from the reactor's
 // media element, finds the current line, fires section-transition + fallback
 // triggers, and pushes the current text into typography mode.
@@ -3761,18 +3805,9 @@ function tickLyricsSync(){
     lyrics.currentIdx = idx;
     if(idx >= 0){
       const line = lyrics.lines[idx];
-      // Push to typography — show the current line as the display text
-      if(typeof typo !== 'undefined'){
-        typo.text = line.text;
-        typo.centerCurrent = line.text;
-        typo.centerSwapT = (state.t/1000) + 100;
-        // Auto-enable typography mode so the user sees the words
-        if(!state.modes.typography){
-          state.modes.typography = true;
-          const cb = document.querySelector('#modes input[data-mode="typography"]');
-          if(cb) cb.checked = true;
-        }
-      }
+      // Drive the Typography system with this line. User's Type-tab choices
+      // (anim, style, color, weight, font) all apply.
+      _applyLyricToTypo(line.text);
       // Section transition → trigger random
       if(line.section && line.section !== lyrics.currentSection){
         const wasFirstLine = lyrics.currentSection === null;
@@ -7480,65 +7515,158 @@ if(state.silentOutput){
   const searchEl = document.getElementById('lyricsSearch');
   const fetchBtn = document.getElementById('lyricsFetch');
   const toggleBtn = document.getElementById('lyricsToggle');
-  const pasteBtn = document.getElementById('lyricsPaste');
   const clearBtn = document.getElementById('lyricsClear');
   const statusEl = document.getElementById('lyricsStatus');
+  const altList  = document.getElementById('lyricsAlternates');
+  const musicInput = document.getElementById('lyricsMusicInput');
+  const musicLabel = document.getElementById('lyricsMusicLabel');
+  const lrcInput   = document.getElementById('lyricsLrcInput');
+  const lrcLabel   = document.getElementById('lyricsLrcLabel');
   if(!searchEl) return;
+
+  let _loadedMusic = null;  // { name, duration } from the music input
+  let _loadedLrc = false;
 
   function setStatus(text){ if(statusEl) statusEl.textContent = text; }
   function setToggleLabel(){
     if(!toggleBtn) return;
-    toggleBtn.textContent = lyrics.enabled ? 'On · sync live' : 'Off';
+    toggleBtn.textContent = lyrics.enabled ? 'Sync ON' : 'Sync off';
     toggleBtn.classList.toggle('on', lyrics.enabled);
+  }
+  function fullStatus(){
+    const parts = [];
+    parts.push(_loadedMusic ? `♪ ${_loadedMusic.name}` : '— no music');
+    if(_loadedLrc){
+      const n = lyrics.lines.length;
+      const c = lyrics.lines.filter(l => l.section === 'chorus').length;
+      const meta = lyrics.meta ? ` · ${lyrics.meta.trackName} — ${lyrics.meta.artistName}` : '';
+      parts.push(`📝 ${n} lines · ${c} chorus${meta}`);
+    } else {
+      parts.push('— no lyrics');
+    }
+    setStatus(parts.join('   '));
+  }
+
+  // Try to extract "Title — Artist" or "Artist - Title" from a filename
+  function parseFilename(name){
+    let s = name.replace(/\.[^.]+$/, '');  // strip extension
+    s = s.replace(/[_\-]/g, ' ').replace(/\s+/g, ' ').trim();
+    // Heuristic: "Title — Artist" if there's an em-dash, otherwise leave as-is
+    return s;
+  }
+
+  // ── Music file upload ──
+  musicInput && musicInput.addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const a = new Audio(URL.createObjectURL(f));
+    a.loop = true;
+    if(typeof reactor !== 'undefined') reactor.useElement(a, f.name);
+    if(typeof setAudioStatus === 'function') setAudioStatus(f.name.length>22 ? f.name.slice(0,20)+'…' : f.name, true);
+    _loadedMusic = { name: f.name, file: f };
+    if(musicLabel) musicLabel.textContent = '♪ ' + (f.name.length>20 ? f.name.slice(0,18)+'…' : f.name);
+    // Pre-fill the search box from filename — gives LRClib a head start
+    const guess = parseFilename(f.name);
+    if(guess && !searchEl.value.trim()) searchEl.value = guess;
+    fullStatus();
+  });
+
+  // ── LRC file upload ──
+  lrcInput && lrcInput.addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const text = await f.text();
+    const ok = loadLyricsFromLRC(text, { trackName: f.name.replace(/\.[^.]+$/, ''), artistName: 'local' });
+    if(ok){
+      _loadedLrc = true;
+      if(lrcLabel) lrcLabel.textContent = '📝 ' + (f.name.length>20 ? f.name.slice(0,18)+'…' : f.name);
+      // Auto-enable sync now that we have lyrics (only if music is also loaded)
+      if(_loadedMusic) lyrics.enabled = true;
+      setToggleLabel();
+      fullStatus();
+    } else {
+      setStatus('could not parse .lrc — expected [mm:ss.xx]text format');
+    }
+  });
+
+  // ── LRClib search ──
+  function clearAlternates(){ if(altList) altList.innerHTML = ''; }
+  function renderAlternates(items, onPick){
+    if(!altList) return;
+    altList.innerHTML = '';
+    for(const it of items){
+      const row = document.createElement('button');
+      row.className = 'audio-btn';
+      row.style.cssText = 'text-align:left;display:flex;justify-content:space-between;gap:8px';
+      const dur = it.duration ? `${Math.floor(it.duration/60)}:${String(it.duration%60).padStart(2,'0')}` : '';
+      row.innerHTML = `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(it.trackName || '?')} — ${escapeHtml(it.artistName || '?')}</span>`
+        + `<span style="opacity:.6;font-size:10px;flex-shrink:0">${dur}${it.hasSynced ? ' · synced' : ''}</span>`;
+      row.addEventListener('click', () => onPick(it));
+      altList.appendChild(row);
+    }
   }
 
   fetchBtn && fetchBtn.addEventListener('click', async () => {
     const q = searchEl.value.trim();
-    if(!q){ setStatus('enter a title — artist (e.g. "moon river — sinatra")'); return; }
+    if(!q){ setStatus('enter "title — artist"'); return; }
     fetchBtn.disabled = true;
     const _orig = fetchBtn.textContent; fetchBtn.textContent = 'fetching…';
     setStatus('searching lrclib…');
+    clearAlternates();
     const res = await fetchLyricsFromQuery(q);
     fetchBtn.disabled = false; fetchBtn.textContent = _orig;
     if(!res || !res.found){
-      setStatus('not found — paste LRC manually or check the spelling');
+      setStatus('no match found — try simpler search OR upload .lrc');
       return;
     }
-    if(!res.synced){
-      setStatus(`found "${res.trackName}" by ${res.artistName} — plain text only (no timing). Paste a timed LRC for sync.`);
-      return;
+    // Show alternates so user can pick the right one
+    const alternates = res.alternates && res.alternates.length > 1 ? res.alternates : null;
+    if(alternates){
+      renderAlternates(alternates, async (pick) => {
+        clearAlternates();
+        setStatus(`loading ${pick.trackName} — ${pick.artistName}…`);
+        const r2 = await fetch('/api/lyrics', {
+          method:'POST', headers:{'content-type':'application/json'},
+          body: JSON.stringify({ artist: pick.artistName, track: pick.trackName, duration: pick.duration })
+        });
+        const data = await r2.json().catch(() => ({}));
+        if(data && data.synced){
+          loadLyricsFromLRC(data.synced, { trackName: pick.trackName, artistName: pick.artistName });
+          _loadedLrc = true;
+          if(lrcLabel) lrcLabel.textContent = '📝 ' + pick.trackName;
+          if(_loadedMusic) lyrics.enabled = true;
+          setToggleLabel();
+          fullStatus();
+        } else {
+          setStatus('that pick has no synced lyrics');
+        }
+      });
     }
-    const ok = loadLyricsFromLRC(res.synced, { trackName: res.trackName, artistName: res.artistName });
-    if(ok){
-      setStatus(`loaded · ${res.trackName} — ${res.artistName} · ${lyrics.lines.length} lines · ${lyrics.lines.filter(l=>l.section==='chorus').length} chorus`);
+    // Also auto-load the top hit if it has synced lyrics
+    if(res.synced){
+      loadLyricsFromLRC(res.synced, { trackName: res.trackName, artistName: res.artistName });
+      _loadedLrc = true;
+      if(lrcLabel) lrcLabel.textContent = '📝 ' + res.trackName;
+      if(_loadedMusic) lyrics.enabled = true;
       setToggleLabel();
-    } else {
-      setStatus('lyrics parsed empty — try another result');
+      fullStatus();
+      if(alternates){
+        setStatus(`auto-loaded "${res.trackName}" — wrong one? Pick from alternates below`);
+      }
     }
   });
 
   toggleBtn && toggleBtn.addEventListener('click', () => {
-    if(!lyrics.lines.length){ setStatus('load lyrics first (Fetch or Paste)'); return; }
+    if(!lyrics.lines.length){ setStatus('load lyrics first (📝 .lrc or Fetch)'); return; }
     lyrics.enabled = !lyrics.enabled;
     setToggleLabel();
   });
 
-  pasteBtn && pasteBtn.addEventListener('click', () => {
-    const text = prompt('Paste LRC content (lines like [01:23.45]歌詞):');
-    if(!text) return;
-    const ok = loadLyricsFromLRC(text, null);
-    if(ok){
-      setStatus(`loaded · ${lyrics.lines.length} lines · ${lyrics.lines.filter(l=>l.section==='chorus').length} chorus`);
-      setToggleLabel();
-    } else {
-      setStatus('could not parse — make sure timestamps are in [mm:ss.xx] format');
-    }
-  });
-
   clearBtn && clearBtn.addEventListener('click', () => {
     clearLyrics();
-    setStatus('no lyrics loaded');
+    _loadedLrc = false;
+    if(lrcLabel) lrcLabel.textContent = '📝 .lrc file…';
+    clearAlternates();
     setToggleLabel();
+    fullStatus();
   });
 
   // Sliders
@@ -8686,7 +8814,10 @@ function drawTypography(g, dt, T){
   }
 
   // —— Spawn-based animations ——
-  if(typo.loop || typo.spawns.length === 0){
+  // When lyrics is driving, _applyLyricToTypo() spawns ONE word per line change.
+  // Skip auto-spawn so we don't stack copies of the same line on the screen.
+  const _lyricsDriving = (typeof lyrics !== 'undefined' && lyrics.enabled);
+  if(!_lyricsDriving && (typo.loop || typo.spawns.length === 0)){
     typo.spawnAcc += dts * sp;
     const need = 1 / Math.max(0.05, typo.rate);
     let safety = 8;
