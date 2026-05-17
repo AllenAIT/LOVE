@@ -115,6 +115,30 @@
   .qa.rec.on{background:linear-gradient(135deg,#ff5070,#ff7a9c);border-color:transparent;color:#0e0c16;animation:rec-pulse 1.4s ease-in-out infinite}
   .qa.rec.on span.lbl{color:#1a0a10}
   @keyframes rec-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,80,110,.5)}50%{box-shadow:0 0 0 10px rgba(255,80,110,0)}}
+
+  /* Lock chips — Random preserves locked groups */
+  .lockbar{
+    display:flex;flex-wrap:wrap;gap:5px;padding:8px 14px 10px;
+    border-bottom:1px solid var(--hairline);
+    background:linear-gradient(180deg, rgba(255,255,255,.015), transparent);
+  }
+  .lockbar .lockbar-lbl{
+    font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-soft);opacity:.55;align-self:center;margin-right:2px;
+  }
+  .lock-chip{
+    appearance:none;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);
+    color:var(--ink-soft);padding:5px 9px;border-radius:7px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:4px;
+    font-family:var(--sans);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+    transition:background .15s, border-color .15s, color .15s;
+  }
+  .lock-chip:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18)}
+  .lock-chip .ico{font-size:11px;opacity:.65}
+  .lock-chip.locked{
+    background:rgba(255,200,120,.14);border-color:rgba(255,200,120,.42);color:#ffd89e;
+  }
+  .lock-chip.locked .ico{opacity:1}
   .rec-timer{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:6;
     background:rgba(255,80,110,.18);border:1px solid rgba(255,80,110,.35);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     color:#ffd9e0;padding:6px 14px;border-radius:999px;font-family:var(--sans);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
@@ -568,6 +592,16 @@
       </button>
     </div>
 
+    <!-- Lock chips — locked groups are preserved across RANDOM -->
+    <div class="lockbar">
+      <span class="lockbar-lbl">Lock</span>
+      <button class="lock-chip" data-lock="style"  title="Keep visual modes & kaleido"><span class="ico">🔓</span>Style</button>
+      <button class="lock-chip" data-lock="color"  title="Keep vibrance, hue, bloom"><span class="ico">🔓</span>Color</button>
+      <button class="lock-chip" data-lock="motion" title="Keep speed, density, glow"><span class="ico">🔓</span>Motion</button>
+      <button class="lock-chip" data-lock="audio"  title="Keep audio gain & impacts"><span class="ico">🔓</span>Audio</button>
+      <button class="lock-chip" data-lock="mirror" title="Keep mirror & kaleido symmetry"><span class="ico">🔓</span>Mirror</button>
+    </div>
+
     <nav class="tabs" id="tabs">
       <button class="on" data-tab="feelings">Feelings</button>
       <button data-tab="field">Field</button>
@@ -701,6 +735,7 @@
               <input type="range" min="0" max="100" value="30" id="dark" />
             </div>
           </div>
+          <label class="mode-chip" style="margin-top:2px"><input type="checkbox" id="lightModeToggle" /><span><strong>Light mode 反相</strong><em>white canvas · dark content (preserves hue)</em></span></label>
         </div>
 
         <div class="section">
@@ -743,6 +778,13 @@
             <label class="mode-chip"><input type="checkbox" data-mode="halftone" /><span><strong>Halftone</strong><em>pulsing dot grid</em></span></label>
             <label class="mode-chip"><input type="checkbox" data-mode="petals" /><span><strong>Petals</strong><em>drifting floral debris</em></span></label>
             <label class="mode-chip"><input type="checkbox" data-mode="aurora" /><span><strong>Aurora</strong><em>vertical light curtains</em></span></label>
+            <label class="mode-chip"><input type="checkbox" data-mode="inkWash" /><span><strong>Ink wash</strong><em>水墨 · brush &amp; bleed</em></span></label>
+            <label class="mode-chip"><input type="checkbox" data-mode="pixel8" /><span><strong>8-Bit</strong><em>像素化 + 16-color palette</em></span></label>
+            <label class="mode-chip"><input type="checkbox" data-mode="popArt" /><span><strong>Pop Art</strong><em>普普 · ben-day dots &amp; panels</em></span></label>
+            <label class="mode-chip"><input type="checkbox" data-mode="glitch" /><span><strong>Glitch</strong><em>故障 · channel split &amp; tear</em></span></label>
+            <label class="mode-chip"><input type="checkbox" data-mode="polygon" /><span><strong>Polygon</strong><em>多邊 · wireframe mesh</em></span></label>
+            <label class="mode-chip"><input type="checkbox" data-mode="matrix" /><span><strong>Matrix rain</strong><em>數位雨 · 緑の文字</em></span></label>
+            <label class="mode-chip"><input type="checkbox" data-mode="eva" /><span><strong>EVA HUD</strong><em>新世紀 · AT-field &amp; warnings</em></span></label>
             <label class="mode-chip"><input type="checkbox" data-mode="webcamFX" /><span><strong>Webcam FX</strong><em>face / hand-driven · uses Live tab</em></span></label>
             <label class="mode-chip"><input type="checkbox" data-mode="typography" /><span><strong>Typography</strong><em>字 · text as VJ visual</em></span></label>
           </div>
@@ -951,6 +993,7 @@
                 <button data-track="hand">Hand</button>
               </div>
               <div class="type-tip" style="margin-top:5px">擇一：face → 從眼睛長出；hand → 從手指長出。</div>
+              <label class="mode-chip" style="margin-top:6px"><input type="checkbox" id="camRemoveBg" /><span><strong>Remove background 去背</strong><em>keep person only (selfie segmenter)</em></span></label>
             </div>
             <div>
               <span class="label" style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:6px">Effect</span>
@@ -1079,6 +1122,7 @@
                 <button data-anim="rotate">Spin<em>旋轉</em></button>
                 <button data-anim="rain">Rain<em>下落雨</em></button>
                 <button data-anim="shimmer">Shimmer<em>閃爍</em></button>
+                <button data-anim="comic">Comic<em>POW! 漫畫爆破</em></button>
               </div>
             </div>
             <details style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:8px 10px">
@@ -1101,14 +1145,31 @@ return {
               <span class="label" style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:6px">Color</span>
               <div class="palette-row" id="typePalette">
                 <button data-col="auto" class="on" style="background:var(--ink)" title="Auto (use emotion)"></button>
+                <button data-col="#000000" style="background:#000000;border:1px solid rgba(255,255,255,.2)" title="Black 黑"></button>
                 <button data-col="#f3eee6" style="background:#f3eee6" title="Bone"></button>
                 <button data-col="#ffffff" style="background:#ffffff" title="White"></button>
+                <button data-col="#ff3344" style="background:#ff3344" title="Red"></button>
+                <button data-col="#ffcc22" style="background:#ffcc22" title="Yellow"></button>
+                <button data-col="#33cc55" style="background:#33cc55" title="Green"></button>
+                <button data-col="#1e88ff" style="background:#1e88ff" title="Blue"></button>
                 <button data-col="#c87cff" style="background:#c87cff" title="Violet"></button>
                 <button data-col="#7fdcff" style="background:#7fdcff" title="Sky"></button>
                 <button data-col="#9bd3a7" style="background:#9bd3a7" title="Sage"></button>
                 <button data-col="#ffb27a" style="background:#ffb27a" title="Amber"></button>
                 <button data-col="#ff7a9c" style="background:#ff7a9c" title="Rose"></button>
                 <button data-col="random" class="rainbow" title="Random per spawn"></button>
+                <input type="color" id="typeColorPicker" value="#ffffff" title="Custom RGB"
+                  style="appearance:none;-webkit-appearance:none;width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.2);background:transparent;cursor:pointer;padding:0;overflow:hidden" />
+              </div>
+            </div>
+            <div class="ctrl"><span class="label">Weight 字重</span><span class="val" id="typeWeightVal">500</span>
+              <div class="slider"><div class="track"></div><div class="fill" id="typeWeightFill"></div><div class="thumb" id="typeWeightThumb"></div>
+                <input type="range" min="100" max="900" step="100" value="500" id="typeWeight" />
+              </div>
+            </div>
+            <div class="ctrl"><span class="label">Outline width 外框</span><span class="val" id="typeOutlineVal">0.04</span>
+              <div class="slider"><div class="track"></div><div class="fill" id="typeOutlineFill"></div><div class="thumb" id="typeOutlineThumb"></div>
+                <input type="range" min="0" max="20" value="4" id="typeOutline" />
               </div>
             </div>
             <div class="ctrl"><span class="label">Speed</span><span class="val" id="typeSpeedVal">1.0×</span>
@@ -1249,9 +1310,20 @@ const state = {
     halftone:     false,   // dot pattern grid
     petals:       false,   // floating rose-petal forms
     aurora:       false,   // shimmering vertical curtains
+    inkWash:      false,   // 水墨 brush strokes & bleeding ink
+    pixel8:       false,   // 8-bit pixelated post-effect with palette quantization
+    popArt:       false,   // 普普藝術 ben-day dots, comic panels, primary slabs
+    glitch:       false,   // databend channel split, scan lines, beat-triggered shifts
+    polygon:      false,   // wireframe mesh, point-line-face geometry (techno staple)
+    matrix:       false,   // green digital rain — vertical char streams
+    eva:          false,   // 新世紀 HUD — red bars, hex AT-field, kanji warnings
     webcamFX:     false,   // face/hand-driven visuals from webcam
     typography:   false,   // text-as-VJ visual (driven by Live tab)
   },
+  // randomize lock groups — locked = RANDOM keeps that group's values
+  locks: { style:false, color:false, motion:false, audio:false, mirror:false },
+  // inverse palette — white canvas, dark content. CSS filter (invert + hue-rotate) preserves hue.
+  lightMode: false,
   // auto-cycle modes based on music sections
   autoCycle: false,
   autoSec: 14,            // seconds between switches (also triggered by energy change)
@@ -3304,9 +3376,420 @@ function drawAurora(g, dt, T){
 }
 
 // ============================================================
+// Ink wash · 水墨 — brush strokes with bleeding edges
+// ============================================================
+let _inkStrokes = [];
+let _inkSpawnT = 0;
+function drawInkWash(g, dt, T){
+  const dts = dt/1000;
+  const interval = Math.max(0.18, 0.9 - state.motionSpeed*0.45 - (reactor.mid||0)*0.4);
+  _inkSpawnT += dts;
+  let safety = 4;
+  while(_inkSpawnT > interval && safety-- > 0){
+    _inkSpawnT -= interval;
+    const fromLeft = Math.random() < 0.5;
+    const cy = Math.random() * H;
+    const stroke = {
+      x0: fromLeft ? -60*SCALE : W+60*SCALE,
+      y0: cy + (Math.random()-0.5)*H*0.3,
+      x1: fromLeft ? W+60*SCALE : -60*SCALE,
+      y1: cy + (Math.random()-0.5)*H*0.3,
+      width: (22 + Math.random()*70) * SCALE,
+      life: 0,
+      maxLife: 1.6 + Math.random()*2.4,
+      bend: (Math.random()-0.5) * H * 0.4,
+      drips: [],
+      splash: (reactor.bass||0) > 0.35 && Math.random() < 0.45,
+      dropsSpawned: false,
+    };
+    _inkStrokes.push(stroke);
+  }
+  if(_inkStrokes.length > 60) _inkStrokes.splice(0, _inkStrokes.length - 60);
+  g.save();
+  g.lineCap = 'round';
+  for(let i=_inkStrokes.length-1; i>=0; i--){
+    const s = _inkStrokes[i];
+    s.life += dts;
+    if(s.life > s.maxLife){ _inkStrokes.splice(i,1); continue; }
+    const prog = s.life / s.maxLife;
+    const draw = Math.min(1, prog * 1.4);
+    const ex = lerp(s.x0, s.x1, draw);
+    const ey = lerp(s.y0, s.y1, draw);
+    const mcx = (s.x0+s.x1)/2;
+    const mcy = (s.y0+s.y1)/2 + s.bend;
+    const alpha = clamp((1 - Math.pow(prog,1.6))*0.6, 0, 0.7);
+    g.strokeStyle = `rgba(12,14,22,${alpha})`;
+    g.lineWidth = s.width * (1 - prog*0.25) * (0.55 + Math.sin(prog*Math.PI)*0.55);
+    g.shadowColor = 'rgba(12,14,22,0.5)';
+    g.shadowBlur = 16 * SCALE;
+    g.beginPath();
+    g.moveTo(s.x0, s.y0);
+    g.quadraticCurveTo(mcx, mcy, ex, ey);
+    g.stroke();
+    if(s.splash && !s.dropsSpawned){
+      s.dropsSpawned = true;
+      const mx = (s.x0+ex)/2 + (Math.random()-0.5)*120*SCALE;
+      const my = (s.y0+ey)/2 + (Math.random()-0.5)*120*SCALE;
+      for(let k=0;k<10;k++){
+        s.drips.push({x: mx + (Math.random()-0.5)*160*SCALE, y: my + (Math.random()-0.5)*160*SCALE, r: (2 + Math.random()*16)*SCALE});
+      }
+    }
+    if(s.drips.length){
+      g.shadowBlur = 8 * SCALE;
+      for(const d of s.drips){
+        g.fillStyle = `rgba(12,14,22,${alpha*0.85})`;
+        g.beginPath(); g.arc(d.x, d.y, d.r * (1 - prog*0.5), 0, TAU); g.fill();
+      }
+    }
+  }
+  g.shadowBlur = 0;
+  g.restore();
+}
+
+// ============================================================
+// 8-Bit · pixelation post-effect with palette quantization
+// ============================================================
+let _px8Cv = null, _px8Ctx = null;
+function drawPixel8(g, dt, T){
+  if(!_px8Cv){
+    _px8Cv = document.createElement('canvas');
+    _px8Ctx = _px8Cv.getContext('2d', { willReadFrequently: true, alpha:false });
+  }
+  // Resolution: ~80 px wide. Higher bass = chunkier on beat.
+  const baseW = 90 - Math.floor((reactor.bass||0)*30);
+  const cw = baseW;
+  const ch = Math.max(1, Math.round(baseW * H/W));
+  if(_px8Cv.width !== cw || _px8Cv.height !== ch){
+    _px8Cv.width = cw; _px8Cv.height = ch;
+  }
+  _px8Ctx.imageSmoothingEnabled = false;
+  _px8Ctx.drawImage(g.canvas, 0, 0, cw, ch);
+  const img = _px8Ctx.getImageData(0, 0, cw, ch);
+  const d = img.data;
+  for(let i=0;i<d.length;i+=4){
+    d[i]   = (d[i]   & 0xE0);
+    d[i+1] = (d[i+1] & 0xE0);
+    d[i+2] = (d[i+2] & 0xC0);
+  }
+  _px8Ctx.putImageData(img, 0, 0);
+  g.save();
+  g.imageSmoothingEnabled = false;
+  g.drawImage(_px8Cv, 0, 0, W, H);
+  g.imageSmoothingEnabled = true;
+  g.restore();
+}
+
+// ============================================================
+// Pop Art · 普普藝術 — ben-day dots, panel grid, primary slabs
+// ============================================================
+function drawPopArt(g, dt, T){
+  const t = state.t * 0.001;
+  const bass = reactor.bass || 0;
+  const beat = state.beatFlash || 0;
+  const palettes = [
+    ['#e94e1b','#f4cf2e','#1d70a2','#f6e7d8'],
+    ['#0f0f0f','#f4cf2e','#e94e1b','#1d70a2'],
+    ['#ff2a6d','#05d9e8','#f5f5f5','#0a0a14'],
+  ];
+  const palette = palettes[Math.floor(t*0.25 + bass*2) % palettes.length];
+  const cx = W/2, cy = H/2;
+  g.save();
+  // Color slabs in quadrants, semi-transparent so base field shows through
+  const quads = [[0,0,cx,cy],[cx,0,cx,cy],[0,cy,cx,cy],[cx,cy,cx,cy]];
+  const cycle = Math.floor(t * (0.4 + bass*1.2));
+  g.globalAlpha = 0.16 + (reactor.vol||0)*0.18 + beat*0.15;
+  quads.forEach((q,i)=>{
+    g.fillStyle = palette[(i + cycle) % palette.length];
+    g.fillRect(q[0], q[1], q[2], q[3]);
+  });
+  g.globalAlpha = 1;
+  // Ben-Day dots — multiply blend, animated
+  g.globalCompositeOperation = 'multiply';
+  const spacing = (12 + Math.sin(t*0.5)*2) * SCALE;
+  const maxDot = (3.2 + bass*2.5) * SCALE;
+  g.fillStyle = '#1a1a1a';
+  for(let y=0; y<H; y+=spacing){
+    const xOff = (Math.floor(y/spacing) % 2) ? spacing*0.5 : 0;
+    for(let x=xOff; x<W; x+=spacing){
+      const wob = Math.sin(x*0.012 + y*0.012 + t*1.3) * 0.4 + 0.6;
+      g.beginPath();
+      g.arc(x, y, Math.max(0, maxDot*wob), 0, TAU);
+      g.fill();
+    }
+  }
+  g.globalCompositeOperation = 'source-over';
+  // Heavy panel borders
+  g.strokeStyle = '#0a0a0a';
+  g.lineWidth = 5 * SCALE;
+  g.beginPath();
+  g.moveTo(cx, 0); g.lineTo(cx, H);
+  g.moveTo(0, cy); g.lineTo(W, cy);
+  g.stroke();
+  g.lineWidth = 8 * SCALE;
+  g.strokeRect(0, 0, W, H);
+  // Comic burst on strong beat
+  if(beat > 0.5){
+    const bx = cx + (Math.random()-0.5)*W*0.5;
+    const by = cy + (Math.random()-0.5)*H*0.5;
+    const spikes = 14;
+    const r1 = 60 * SCALE * (1 + beat*0.6);
+    const r2 = 100 * SCALE * (1 + beat*0.8);
+    g.fillStyle = palette[0];
+    g.strokeStyle = '#0a0a0a';
+    g.lineWidth = 4 * SCALE;
+    g.beginPath();
+    for(let k=0;k<spikes*2;k++){
+      const a = (k/(spikes*2)) * TAU;
+      const r = (k%2) ? r1 : r2;
+      const px = bx + Math.cos(a)*r;
+      const py = by + Math.sin(a)*r;
+      if(k===0) g.moveTo(px,py); else g.lineTo(px,py);
+    }
+    g.closePath();
+    g.fill(); g.stroke();
+  }
+  g.restore();
+}
+
+// ============================================================
+// Glitch · datamosh slice shifts + scan lines + tear bars
+// ============================================================
+function drawGlitch(g, dt, T){
+  const beat = state.beatFlash || 0;
+  const bass = reactor.bass || 0;
+  const treble = reactor.treble || 0;
+  g.save();
+  const intensity = 0.25 + bass*1.4 + beat*0.7;
+  const sliceN = Math.floor(2 + intensity * 9);
+  for(let i=0;i<sliceN;i++){
+    const y = Math.floor(Math.random() * H);
+    const sliceH = 6 + Math.floor(Math.random() * 50);
+    const shift = (Math.random()-0.5) * 80 * intensity * SCALE;
+    if(Math.abs(shift) < 3) continue;
+    try {
+      g.drawImage(g.canvas, 0, y*state.pixelRatio, W*state.pixelRatio, sliceH*state.pixelRatio,
+                            shift, y, W, sliceH);
+    } catch(e){}
+  }
+  // Beat-triggered tear (full-width difference bar)
+  if(beat > 0.35 && Math.random() < 0.7){
+    const tearY = Math.random() * H;
+    const tearH = (6 + Math.random() * 28) * SCALE;
+    g.globalCompositeOperation = 'difference';
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, tearY, W, tearH);
+    g.globalCompositeOperation = 'source-over';
+  }
+  // RGB-ish channel offset hint (treble drives chromatic shift)
+  if(treble > 0.25){
+    const off = treble * 4 * SCALE;
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = 0.18;
+    g.fillStyle = '#ff003c';
+    g.fillRect(off, 0, W, H);
+    g.fillStyle = '#00d8ff';
+    g.fillRect(-off, 0, W, H);
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+  }
+  // Scan lines
+  g.globalCompositeOperation = 'multiply';
+  g.globalAlpha = 0.35;
+  g.fillStyle = '#181820';
+  for(let y=0;y<H;y+=3){
+    g.fillRect(0, y, W, 1);
+  }
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'source-over';
+  g.restore();
+}
+
+// ============================================================
+// Polygon · wireframe mesh, point-line-face geometry
+// ============================================================
+let _polyVerts = null;
+function drawPolygon(g, dt, T){
+  if(!_polyVerts){
+    _polyVerts = [];
+    for(let i=0;i<14;i++){
+      _polyVerts.push({
+        x: (Math.random()-0.5)*2,
+        y: (Math.random()-0.5)*2,
+        z: (Math.random()-0.5)*2,
+      });
+    }
+  }
+  const dom = dominantEmo();
+  const t = state.t * 0.0006 * (0.5 + state.motionSpeed + (reactor.mid||0)*0.8);
+  const cx = W/2, cy = H/2;
+  const scale = Math.min(W,H) * 0.32 * (1 + (reactor.bass||0)*0.35);
+  const ca = Math.cos(t), sa = Math.sin(t);
+  const cb = Math.cos(t*0.73), sb = Math.sin(t*0.73);
+  const projected = _polyVerts.map(v=>{
+    const x1 = v.x * ca - v.z * sa;
+    const z1 = v.x * sa + v.z * ca;
+    const y1 = v.y * cb - z1 * sb;
+    const z2 = v.y * sb + z1 * cb;
+    const persp = 2 / Math.max(0.5, 2.6 - z2);
+    return { x: cx + x1*scale*persp, y: cy + y1*scale*persp, z: z2, depth: persp };
+  });
+  g.save();
+  const h = dom.hue[0];
+  const sat = dom.sat;
+  const lt = dom.light;
+  g.lineWidth = 1.2 * SCALE;
+  const maxD = Math.min(W,H)*0.45;
+  for(let i=0;i<projected.length;i++){
+    for(let j=i+1;j<projected.length;j++){
+      const a = projected[i], b = projected[j];
+      const dx = a.x-b.x, dy = a.y-b.y;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      if(dist < maxD){
+        const al = (1 - dist/maxD) * 0.55 * state.glow;
+        g.strokeStyle = `hsla(${h},${sat}%,${lt+25}%,${al})`;
+        g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+      }
+    }
+  }
+  // Filled triangles between near triples on bass
+  if((reactor.bass||0) > 0.3){
+    g.globalCompositeOperation = 'lighter';
+    for(let i=0;i<projected.length;i+=2){
+      const a = projected[i], b = projected[(i+1)%projected.length], c = projected[(i+2)%projected.length];
+      g.fillStyle = `hsla(${h+i*8},${sat}%,${lt+20}%,${0.08 + (reactor.bass||0)*0.18})`;
+      g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.closePath(); g.fill();
+    }
+    g.globalCompositeOperation = 'source-over';
+  }
+  // Vertex dots
+  for(const p of projected){
+    g.fillStyle = `hsla(${h},${sat}%,${lt+35}%,${0.8 * Math.min(1, p.depth)})`;
+    g.beginPath(); g.arc(p.x, p.y, 2.5 * SCALE * Math.min(1.6, p.depth), 0, TAU); g.fill();
+  }
+  g.restore();
+}
+
+// ============================================================
+// Matrix rain · vertical green character streams
+// ============================================================
+let _matrixCols = null;
+let _matrixColW = 0;
+const _matrixChars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモ0123456789ABCDEFΣΩΨΦΛΞ';
+function drawMatrix(g, dt, T){
+  const colW = Math.max(10, Math.floor(13 * SCALE));
+  if(!_matrixCols || _matrixColW !== colW || _matrixCols.length * colW < W - colW){
+    _matrixCols = [];
+    _matrixColW = colW;
+    for(let x=0; x<W; x+=colW){
+      _matrixCols.push({ x, y: Math.random()*H, speed: 90 + Math.random()*220, trail: 14 + Math.floor(Math.random()*16) });
+    }
+  }
+  const dts = dt / 1000;
+  const fontSize = colW * 1.05;
+  g.save();
+  g.font = `${fontSize}px monospace`;
+  g.textBaseline = 'top';
+  const bassBoost = 1 + (reactor.bass||0)*1.4;
+  for(const col of _matrixCols){
+    col.y += col.speed * dts * bassBoost;
+    if(col.y > H + 200) col.y = -Math.random()*400;
+    for(let k=0; k<col.trail; k++){
+      const cy = col.y - k * fontSize;
+      if(cy < -fontSize || cy > H) continue;
+      const alpha = (1 - k/col.trail) * (0.85 + (reactor.vol||0)*0.2);
+      const seed = Math.floor((cy*0.12 + state.t*0.005 + col.x*0.04 + k*1.7));
+      const ch = _matrixChars[((seed % _matrixChars.length) + _matrixChars.length) % _matrixChars.length];
+      if(k===0){
+        g.fillStyle = `rgba(220,255,225,${alpha})`;
+        g.shadowColor = 'rgba(120,255,150,0.85)';
+        g.shadowBlur = 12 * SCALE;
+      } else {
+        g.fillStyle = `rgba(50,230,110,${alpha*0.55})`;
+        g.shadowBlur = 0;
+      }
+      g.fillText(ch, col.x, cy);
+    }
+  }
+  g.shadowBlur = 0;
+  g.restore();
+}
+
+// ============================================================
+// EVA HUD · 新世紀 — red bars, AT-field hexagons, warnings
+// ============================================================
+function drawEva(g, dt, T){
+  const t = state.t * 0.001;
+  const beat = state.beatFlash || 0;
+  const bass = reactor.bass || 0;
+  g.save();
+  const barH = Math.max(22, 30 * SCALE);
+  // top + bottom red bars
+  g.fillStyle = 'rgba(178,28,28,0.9)';
+  g.fillRect(0, 0, W, barH);
+  g.fillRect(0, H - barH, W, barH);
+  // bars edge stripe
+  g.fillStyle = 'rgba(255,200,40,0.95)';
+  g.fillRect(0, barH-2, W, 2);
+  g.fillRect(0, H-barH, W, 2);
+  // text
+  g.fillStyle = '#fffaf0';
+  const fz = Math.max(12, 15 * SCALE);
+  g.font = `900 ${fz}px sans-serif`;
+  g.textBaseline = 'middle';
+  const flick = (Math.floor(t*5) % 2) === 0;
+  const msgs = ['警告','危険','使徒接近','TARGET LOCK','PATTERN BLUE','A.T.FIELD','SYNCHRO'];
+  const m = msgs[Math.floor(t*0.7) % msgs.length];
+  g.fillText(m, 14*SCALE, barH/2);
+  g.textAlign = 'right';
+  g.fillText(`VOL ${Math.floor((reactor.vol||0)*100).toString().padStart(2,'0')}`, W - 14*SCALE, barH/2);
+  g.textAlign = 'left';
+  g.fillText(`SYNC ${Math.floor(bass*100).toString().padStart(2,'0')}%`, 14*SCALE, H - barH/2);
+  g.textAlign = 'right';
+  g.fillText(flick ? '◆ ARMED' : '◇ STBY', W - 14*SCALE, H - barH/2);
+  g.textAlign = 'left';
+  // AT-field hex grid
+  g.globalCompositeOperation = 'lighter';
+  const hexSize = 70 * SCALE;
+  const hexAlpha = 0.05 + bass*0.22 + beat*0.18;
+  g.strokeStyle = `rgba(255,140,40,${hexAlpha})`;
+  g.lineWidth = 1.4 * SCALE;
+  const hStep = hexSize * 1.5;
+  const vStep = hexSize * Math.sqrt(3);
+  for(let row=-1; row*vStep < H+vStep; row++){
+    for(let col=-1; col*hStep < W+hStep; col++){
+      const hx = col * hStep;
+      const hy = row * vStep + ((col % 2 + 2) % 2 ? vStep/2 : 0);
+      g.beginPath();
+      for(let k=0;k<6;k++){
+        const a = k * Math.PI/3;
+        const px = hx + hexSize * Math.cos(a);
+        const py = hy + hexSize * Math.sin(a);
+        if(k===0) g.moveTo(px, py); else g.lineTo(px, py);
+      }
+      g.closePath();
+      g.stroke();
+    }
+  }
+  g.globalCompositeOperation = 'source-over';
+  // center reticle
+  g.strokeStyle = 'rgba(255,180,40,0.85)';
+  g.lineWidth = 1.6 * SCALE;
+  const cx = W/2, cy = H/2;
+  const ret = (28 + Math.sin(t*2)*4) * SCALE;
+  g.beginPath();
+  g.moveTo(cx-ret*1.8, cy); g.lineTo(cx-ret*0.4, cy);
+  g.moveTo(cx+ret*0.4, cy); g.lineTo(cx+ret*1.8, cy);
+  g.moveTo(cx, cy-ret*1.8); g.lineTo(cx, cy-ret*0.4);
+  g.moveTo(cx, cy+ret*0.4); g.lineTo(cx, cy+ret*1.8);
+  g.stroke();
+  g.beginPath(); g.arc(cx, cy, ret*0.7, 0, TAU); g.stroke();
+  g.restore();
+}
+
+// ============================================================
 // Auto-cycle: detect music sections and rotate enabled modes
 // ============================================================
-const CYCLE_MODES = ['lineTrace','flowField','mandalaRings','waveform','constellation','spiral','ripples','crystals','ribbons','tunnel','halftone','petals','aurora'];
+const CYCLE_MODES = ['lineTrace','flowField','mandalaRings','waveform','constellation','spiral','ripples','crystals','ribbons','tunnel','halftone','petals','aurora','inkWash','popArt','polygon','matrix','glitch','eva'];
 let _cycleIdx = 0;
 function maybeAutoCycle(now){
   if(!state.autoCycle) return;
@@ -3350,6 +3833,14 @@ window._drawModes = function(g, dt, T){
   if(state.modes.halftone)      drawHalftone(g, dt, T);
   if(state.modes.petals)        drawPetals(g, dt, T);
   if(state.modes.aurora)        drawAurora(g, dt, T);
+  if(state.modes.inkWash)       drawInkWash(g, dt, T);
+  if(state.modes.popArt)        drawPopArt(g, dt, T);
+  if(state.modes.polygon)       drawPolygon(g, dt, T);
+  if(state.modes.matrix)        drawMatrix(g, dt, T);
+  if(state.modes.glitch)        drawGlitch(g, dt, T);
+  if(state.modes.eva)           drawEva(g, dt, T);
+  // pixel8 last — quantizes everything drawn above into pixel-art
+  if(state.modes.pixel8)        drawPixel8(g, dt, T);
 };
 window._maybeAutoCycle = maybeAutoCycle;
 
@@ -3968,7 +4459,23 @@ function randomizeAll(){
 
   // 2. Reset all visual artifacts
   for(const e of EMOTIONS) state.values[e.id] = 0;
+  // Snapshot for lock preservation — locked groups get restored after the random roll.
+  const L = state.locks;
+  const snap = {
+    modes: { ...state.modes },
+    kaleido: state.kaleido, mirror: state.mirror,
+    vibrance: state.vibrance, hueShift: state.hueShift, bgDark: state.bgDark,
+    bloom: state.bloom, trails: state.trails, grain: state.grain, vignette: state.vignette,
+    density: state.density, motionSpeed: state.motionSpeed, turbulence: state.turbulence, glow: state.glow,
+    audioGain: state.audioGain, bassImpact: state.bassImpact, midImpact: state.midImpact, trebleImpact: state.trebleImpact,
+  };
+  // Preserve webcamFX + typography across random rolls — they're persistent input/output
+  // streams (camera feed, live text), not generative field modes.
+  const _keepWebcam = state.modes.webcamFX;
+  const _keepTypo   = state.modes.typography;
   for(const k in state.modes) state.modes[k] = (k === 'base');
+  state.modes.webcamFX   = _keepWebcam;
+  state.modes.typography = _keepTypo;
   state.kaleido = 0; state.mirror = 0;
   if(modeState){
     modeState.trace.path.length = 0;
@@ -4021,8 +4528,8 @@ function randomizeAll(){
 
   // 7. Visual modes — 1–4 active, biased by intensity
   // Categorize modes by 'energy' — hot tracks favor explosive/symmetric, cool favors flowy/sparse
-  const hotModes  = ['crystals','ripples','spiral','tunnel','mandalaRings','halftone'];
-  const coolModes = ['lineTrace','flowField','constellation','ribbons','petals','aurora','waveform'];
+  const hotModes  = ['crystals','ripples','spiral','tunnel','mandalaRings','halftone','popArt','glitch','polygon','matrix','eva','pixel8'];
+  const coolModes = ['lineTrace','flowField','constellation','ribbons','petals','aurora','waveform','inkWash','polygon','matrix'];
   const nModes = 1 + Math.floor(Math.random()*(1 + hot*3.2));
   const enabled = new Set();
   for(let i=0;i<nModes;i++){
@@ -4069,6 +4576,26 @@ function randomizeAll(){
     const pool = Math.random() < hot*0.7 + 0.2 ? intenseAesthetics : softAesthetics;
     const m = pool[Math.floor(Math.random()*pool.length)];
     imgState.modes[m] = true;
+  }
+
+  // 10. Honor locks — restore snapshotted groups (locked → preserved across random)
+  if(L.style){
+    state.modes = { ...snap.modes };
+  }
+  if(L.color){
+    state.vibrance = snap.vibrance; state.hueShift = snap.hueShift; state.bgDark = snap.bgDark;
+    state.bloom = snap.bloom; state.trails = snap.trails; state.grain = snap.grain; state.vignette = snap.vignette;
+  }
+  if(L.motion){
+    state.density = snap.density; state.motionSpeed = snap.motionSpeed;
+    state.turbulence = snap.turbulence; state.glow = snap.glow;
+  }
+  if(L.audio){
+    state.audioGain = snap.audioGain; state.bassImpact = snap.bassImpact;
+    state.midImpact = snap.midImpact; state.trebleImpact = snap.trebleImpact;
+  }
+  if(L.mirror){
+    state.kaleido = snap.kaleido; state.mirror = snap.mirror;
   }
 
   syncAllUI();
@@ -4851,6 +5378,30 @@ $('qaResetTop').addEventListener('click', () => $('reset') && $('reset').click()
 $('qaSaveTop').addEventListener('click', () => $('save') && $('save').click());
 $('qaGenerateTop').addEventListener('click', () => $('generate') && $('generate').click());
 
+// Lock chips — toggle preservation of attribute groups across RANDOM
+document.querySelectorAll('.lock-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const k = chip.dataset.lock;
+    state.locks[k] = !state.locks[k];
+    chip.classList.toggle('locked', state.locks[k]);
+    chip.querySelector('.ico').textContent = state.locks[k] ? '🔒' : '🔓';
+  });
+});
+
+// Light mode — invert canvas luminance while preserving hue via CSS filter trick.
+// invert(1) flips RGB, hue-rotate(180) undoes the hue flip → net effect = luminance inversion.
+function applyLightMode(){
+  cv.style.filter = state.lightMode ? 'invert(1) hue-rotate(180deg)' : '';
+  document.body.style.background = state.lightMode ? '#f4ede0' : '';
+}
+const lightModeToggle = document.getElementById('lightModeToggle');
+if(lightModeToggle){
+  lightModeToggle.addEventListener('change', () => {
+    state.lightMode = lightModeToggle.checked;
+    applyLightMode();
+  });
+}
+
 /* —————————————————————————————————————————————————————————————————————
    Live recording (MediaRecorder of canvas stream)
    ————————————————————————————————————————————————————————————————————— */
@@ -4989,9 +5540,15 @@ const cam = {
   // mediapipe instances
   faceLM: null,
   handLM: null,
+  segLM: null,
   faceLoading: false,
   handLoading: false,
+  segLoading: false,
   lastDetectT: 0,
+  // background removal (face track) — keeps only the person
+  removeBg: false,
+  segMaskData: null,    // Uint8Array category mask (1 byte per pixel, 0=person, 255=bg by model convention; we treat <128 as person)
+  segMaskW: 0, segMaskH: 0,
   // off-screen for sampling video frames
   fxState: { tendrils:[], petals:[], rays:[], orbits:[], emit:[], trail:null, pulse:[], confetti:[], stars:[] },
 };
@@ -5006,7 +5563,7 @@ async function loadMediaPipe(which){
       return null;
     }
   }
-  const { FaceLandmarker, HandLandmarker, FilesetResolver } = window._mpVision;
+  const { FaceLandmarker, HandLandmarker, ImageSegmenter, FilesetResolver } = window._mpVision;
   const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.10/wasm');
   if(which === 'face' && !cam.faceLM){
     cam.faceLoading = true;
@@ -5024,7 +5581,15 @@ async function loadMediaPipe(which){
     });
     cam.handLoading = false;
   }
-  return cam[which==='face'?'faceLM':'handLM'];
+  if(which === 'seg' && !cam.segLM && ImageSegmenter){
+    cam.segLoading = true;
+    cam.segLM = await ImageSegmenter.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite', delegate:'GPU' },
+      runningMode: 'VIDEO', outputCategoryMask: true, outputConfidenceMasks: false,
+    });
+    cam.segLoading = false;
+  }
+  return which === 'seg' ? cam.segLM : cam[which==='face'?'faceLM':'handLM'];
 }
 
 async function camStart(){
@@ -5132,6 +5697,22 @@ wireCamSlider('camVid','camVidFill','camVidThumb','camVidVal','videoOpacity', v 
 wireCamSlider('camFxSize','camFxSizeFill','camFxSizeThumb','camFxSizeVal','fxSize', v => (v/100).toFixed(1)+'×', v => v/100);
 wireCamSlider('camMirror','camMirrorFill','camMirrorThumb','camMirrorVal','mirror', v => v ? 'on' : 'off');
 
+// Background removal toggle — lazy-loads the selfie segmenter on first enable
+const camRemoveBg = document.getElementById('camRemoveBg');
+if(camRemoveBg){
+  camRemoveBg.addEventListener('change', async () => {
+    cam.removeBg = camRemoveBg.checked;
+    if(cam.removeBg && !cam.segLM){
+      setCamStatus('loading segmenter…');
+      await loadMediaPipe('seg');
+      setCamStatus(cam.ready ? 'live · ' + cam.track + ' · seg' : 'segmenter ready');
+    }
+    if(!cam.removeBg){
+      cam.segMaskData = null;
+    }
+  });
+}
+
 /* —————————————————————————————————————————————————————————————————————
    MediaPipe detection loop (decoupled from main RAF; faster)
    ————————————————————————————————————————————————————————————————————— */
@@ -5148,20 +5729,72 @@ async function detectLoop(){
         const r = cam.handLM.detectForVideo(v, t);
         cam.handLandmarks = (r.landmarks && r.landmarks.length) ? r.landmarks : null;
       }
+      // Background-removal segmentation runs in parallel when toggled on
+      if(cam.removeBg && cam.segLM){
+        cam.segLM.segmentForVideo(v, t, (result) => {
+          const cm = result.categoryMask;
+          if(!cm) return;
+          cam.segMaskData = cm.getAsUint8Array();
+          cam.segMaskW = cm.width; cam.segMaskH = cm.height;
+          cm.close();
+        });
+      }
     }catch(_){}
   }
   requestAnimationFrame(detectLoop);
 }
 detectLoop();
 
+// Build/refresh the alpha mask canvas from segMaskData (0=person, 255=bg in selfie_segmenter)
+const _segMaskCv = document.createElement('canvas');
+const _segMaskCtx = _segMaskCv.getContext('2d', { willReadFrequently: false });
+function rebuildSegMaskCanvas(){
+  if(!cam.segMaskData || !cam.segMaskW || !cam.segMaskH) return null;
+  if(_segMaskCv.width !== cam.segMaskW || _segMaskCv.height !== cam.segMaskH){
+    _segMaskCv.width = cam.segMaskW; _segMaskCv.height = cam.segMaskH;
+  }
+  const img = _segMaskCtx.createImageData(cam.segMaskW, cam.segMaskH);
+  const d = img.data;
+  const src = cam.segMaskData;
+  // selfie_segmenter: 0 = person/foreground (we want to keep), 255 = background
+  for(let i=0;i<src.length;i++){
+    const isPerson = src[i] < 128;
+    const j = i*4;
+    d[j] = d[j+1] = d[j+2] = 255;
+    d[j+3] = isPerson ? 255 : 0;
+  }
+  _segMaskCtx.putImageData(img, 0, 0);
+  return _segMaskCv;
+}
+
 /* —————————————————————————————————————————————————————————————————————
    drawWebcamFX — renders video + face/hand-driven effects on the canvas
    ————————————————————————————————————————————————————————————————————— */
+// Cached offscreen for masked video output (background removal)
+const _segVidCv = document.createElement('canvas');
+const _segVidCtx = _segVidCv.getContext('2d');
+function getMaskedVideo(rawVideo, vw, vh){
+  if(!cam.removeBg || !cam.segMaskData) return rawVideo;
+  if(_segVidCv.width !== vw || _segVidCv.height !== vh){
+    _segVidCv.width = vw; _segVidCv.height = vh;
+  }
+  _segVidCtx.globalCompositeOperation = 'source-over';
+  _segVidCtx.drawImage(rawVideo, 0, 0, vw, vh);
+  const maskCv = rebuildSegMaskCanvas();
+  if(maskCv){
+    _segVidCtx.globalCompositeOperation = 'destination-in';
+    _segVidCtx.drawImage(maskCv, 0, 0, vw, vh);
+    _segVidCtx.globalCompositeOperation = 'source-over';
+  }
+  return _segVidCv;
+}
+
 function drawWebcamFX(g, dt, T){
   if(!cam.ready) return;
-  const v = cam.video;
-  if(!v.videoWidth) return;
-  const vw = v.videoWidth, vh = v.videoHeight;
+  const rawV = cam.video;
+  if(!rawV.videoWidth) return;
+  const vw = rawV.videoWidth, vh = rawV.videoHeight;
+  const v = getMaskedVideo(rawV, vw, vh);
   // cover-fit: scale video to fill canvas, mirrored if requested
   const sCanvas = Math.max(W/vw, H/vh);
   const dW = vw*sCanvas, dH = vh*sCanvas;
@@ -5624,6 +6257,8 @@ const typo = {
   loop: true,
   sizeScale: 1.0,
   style: 'solid',        // 'solid' | 'outline' | 'mix' (per-spawn random) | 'split' (top outline / bottom fill)
+  outlineWidth: 0.04,    // stroke width as a fraction of font size (renderStyledText)
+  weight: 500,           // CSS font-weight (100..900)
   kaleido: 0,            // independent typography kaleido segments (0 = off)
   spawns: [],
   spawnAcc: 0,
@@ -5716,8 +6351,21 @@ function spawnWord(text){
     word.rot = rand(-0.12, 0.12);
     word.life = typo.life * rand(0.6, 1.4);  // varied lifetime so they don't all die together
   }
-  // center layout: one word at a time (it morphs / breathes in place) — but NOT for popIn
-  if(typo.layout === 'center' && typo.anim !== 'rain' && typo.anim !== 'popIn') typo.spawns.length = 0;
+  if(typo.anim === 'comic'){
+    // POW! burst — random position, tilted, with star-burst frame data
+    word.x = rand(W*0.15, W*0.85);
+    word.y = rand(H*0.18, H*0.82);
+    word.align = 'center';
+    word.rot = rand(-0.25, 0.25);
+    word.size = rand(Math.min(W,H)*0.10, Math.min(W,H)*0.22);
+    word.life = typo.life * rand(0.45, 0.85);
+    word.comicSpikes = 9 + Math.floor(Math.random()*7);
+    word.comicRot = rand(0, TAU);
+    const comicFills = ['#f4cf2e','#e94e1b','#ffffff','#f5c5d8','#7fdcff','#9bd3a7'];
+    word.comicFill = comicFills[Math.floor(Math.random()*comicFills.length)];
+  }
+  // center layout: one word at a time (it morphs / breathes in place) — but NOT for popIn/comic
+  if(typo.layout === 'center' && typo.anim !== 'rain' && typo.anim !== 'popIn' && typo.anim !== 'comic') typo.spawns.length = 0;
   typo.spawns.push(word);
   // for 'mix' style, decide once per spawn whether this one is outlined or filled
   if(typo.style === 'mix') word.outlineSpawn = Math.random() < 0.5;
@@ -5856,6 +6504,14 @@ function drawTypography(g, dt, T){
         if(Math.random() < 0.03*sp) alpha = Math.min(1, alpha + 0.5);
         break;
       }
+      case 'comic': {
+        // POW! style — pop-in with overshoot + slight tilt + persistent burst frame
+        const pop = Math.min(1, age*5*sp);
+        scale = 0.5 + 0.5*easeOutBack(pop);
+        rot = (w.rot || 0) + Math.sin(t0*1.4*sp + w.phase) * 0.06;
+        // burst is drawn behind the text via w.comicBurst flag (rendered in render block)
+        break;
+      }
       default: {
         // Custom effect: typo.anim looks like 'custom:NAME' — delegate to user function.
         if(typeof window._applyCustomTypoEffect === 'function'){
@@ -5882,6 +6538,29 @@ function drawTypography(g, dt, T){
     g.translate(w.x + dx, w.y + dy);
     if(rot) g.rotate(rot);
     if(scale !== 1) g.scale(scale, scale);
+    // Comic anim — draw burst shape BEHIND the text
+    if(typo.anim === 'comic'){
+      const spikes = w.comicSpikes || 12;
+      const r1 = w.size * 0.85;
+      const r2 = w.size * 1.35;
+      const burstAngle = (w.comicRot || 0) + t0*0.4*sp;
+      g.save();
+      g.rotate(burstAngle);
+      g.beginPath();
+      for(let k=0;k<spikes*2;k++){
+        const a = (k/(spikes*2)) * TAU;
+        const r = (k%2) ? r1 : r2;
+        const px = Math.cos(a)*r, py = Math.sin(a)*r;
+        if(k===0) g.moveTo(px,py); else g.lineTo(px,py);
+      }
+      g.closePath();
+      g.fillStyle = w.comicFill || '#f4cf2e';
+      g.fill();
+      g.lineWidth = Math.max(2, w.size * 0.035);
+      g.strokeStyle = '#0a0a0a';
+      g.stroke();
+      g.restore();
+    }
     renderStyledText(g, w.text, 0, 0, w.size, w.color, w.outlineSpawn);
     g.restore();
   }
@@ -5889,8 +6568,7 @@ function drawTypography(g, dt, T){
 }
 
 function pickWeight(w){
-  if(typo.family === 'recursive') return '500';
-  return '500';
+  return String(typo.weight || 500);
 }
 function easeOutBack(t){ const c1=1.70158, c3=c1+1; return 1 + c3*Math.pow(t-1,3) + c1*Math.pow(t-1,2); }
 
@@ -5912,9 +6590,10 @@ function drawCenteredText(g, text, alpha, pulse, sizeOverride){
 function renderStyledText(g, text, x, y, size, color, outlineSpawn){
   const style = typo.style || 'solid';
   const useOutline = style === 'outline' || (style === 'mix' && outlineSpawn);
+  const lwFrac = typo.outlineWidth != null ? typo.outlineWidth : 0.04;
+  const lw = Math.max(0.5, size * lwFrac);
   if(style === 'split'){
     // bottom half: filled. top half: outlined.
-    const lw = Math.max(1.5, size * 0.04);
     g.save();
     g.beginPath(); g.rect(x - size*4, y, size*8, size*3); g.clip();
     g.fillStyle = color;
@@ -5931,7 +6610,7 @@ function renderStyledText(g, text, x, y, size, color, outlineSpawn){
   }
   if(useOutline){
     g.strokeStyle = color;
-    g.lineWidth = Math.max(1.5, size * 0.04);
+    g.lineWidth = lw;
     g.lineJoin = 'round';
     g.strokeText(text, x, y);
     return;
@@ -6007,6 +6686,18 @@ function wireTypeSlider(id, fillId, thumbId, valId, key, fmt, scale){
 }
 wireTypeSlider('typeSpeed','typeSpeedFill','typeSpeedThumb','typeSpeedVal','speed', v => v.toFixed(2)+'×', v => v/100);
 wireTypeSlider('typeSizeScale','typeSizeScaleFill','typeSizeScaleThumb','typeSizeScaleVal','sizeScale', v => v.toFixed(2)+'×', v => v/100);
+wireTypeSlider('typeWeight','typeWeightFill','typeWeightThumb','typeWeightVal','weight', v => String(v), v => v);
+wireTypeSlider('typeOutline','typeOutlineFill','typeOutlineThumb','typeOutlineVal','outlineWidth', v => (v/100).toFixed(2), v => v/100);
+
+// Custom RGB color picker for typography
+const typeColorPicker = document.getElementById('typeColorPicker');
+if(typeColorPicker){
+  typeColorPicker.addEventListener('input', () => {
+    typo.color = typeColorPicker.value;
+    document.querySelectorAll('#typePalette button').forEach(b => b.classList.remove('on'));
+    ensureMode('typography', true);
+  });
+}
 wireTypeSlider('typeRate','typeRateFill','typeRateThumb','typeRateVal','rate', v => v.toFixed(1)+'/s', v => v/10);
 wireTypeSlider('typeLife','typeLifeFill','typeLifeThumb','typeLifeVal','life', v => v.toFixed(1)+'s',  v => v/10);
 wireTypeSlider('typeDens','typeDensFill','typeDensThumb','typeDensVal','density', v => v.toFixed(2),   v => v/100);
