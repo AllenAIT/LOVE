@@ -1374,6 +1374,10 @@ const state = {
     viewBox: [0, 0, 200, 200],
     color: '#0a0a0a',
     born: 0,
+    drawIn: true,     // animate the line being drawn on load
+    drawInDur: 2.4,   // seconds for full draw-in
+    loopDraw: false,  // re-draw forever (line erases and redraws)
+    _lens: [],        // measured path lengths (computed via hidden SVG)
   },
   // auto-cycle modes based on music sections
   autoCycle: false,
@@ -7877,6 +7881,28 @@ const SKETCH_FALLBACK = (() => {
   return m;
 })();
 
+// Measure path lengths via a hidden SVG (browsers don't expose getTotalLength on Path2D).
+const _sketchMeasureSVG = (() => {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width','0'); svg.setAttribute('height','0');
+  svg.style.position = 'absolute'; svg.style.visibility = 'hidden';
+  document.body.appendChild(svg);
+  return svg;
+})();
+function measurePathLengths(paths){
+  const out = [];
+  for(const d of paths){
+    try {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      el.setAttribute('d', d);
+      _sketchMeasureSVG.appendChild(el);
+      out.push(el.getTotalLength() || 200);
+      _sketchMeasureSVG.removeChild(el);
+    } catch(e){ out.push(200); }
+  }
+  return out;
+}
+
 function drawSketch(g, dt){
   const s = state.sketch;
   const [vx,vy,vw,vh] = s.viewBox;
@@ -7887,7 +7913,7 @@ function drawSketch(g, dt){
   const t = state.t * 0.001;
   // anim transforms
   let sx = 1, sy = 1, tx = 0, ty = 0;
-  let lineWidth = 1.8 * SCALE;  // thinner = more elegant one-line drawing feel
+  let lineWidth = 1.8 * SCALE;
   if(s.anim === 'pulse'){
     const beat = (reactor.bass || 0)*0.4 + 0.5 + 0.5*Math.sin(t * 2.5);
     sx = sy = 1 + beat*0.16;
@@ -7899,6 +7925,24 @@ function drawSketch(g, dt){
     tx = Math.sin(t * 0.4) * W * 0.05;
     ty = Math.sin(t * 0.6) * H * 0.04;
   }
+
+  // Compute draw-in progress (0..1). When loopDraw is on, restarts every cycle with a brief pause.
+  const ageS = (state.t - s.born) / 1000;
+  let drawProgress = 1;
+  if(s.drawIn){
+    if(s.loopDraw){
+      const cycle = s.drawInDur + 1.2;  // 1.2s pause between redraws
+      const phase = ageS % cycle;
+      drawProgress = phase < s.drawInDur ? phase / s.drawInDur : 1;
+    } else {
+      drawProgress = Math.min(1, ageS / s.drawInDur);
+    }
+  }
+  // Ease the progress so the line accelerates from a slow start (calligraphic feel).
+  const easedProgress = drawProgress < 1
+    ? drawProgress * drawProgress * (3 - 2*drawProgress)
+    : 1;
+
   g.save();
   g.translate(W/2 + tx, H/2 + ty);
   g.scale(sx, sy);
@@ -7906,28 +7950,77 @@ function drawSketch(g, dt){
   const inkColor = state.lightMode ? '#0a0a14' : '#f5efe3';
   g.lineCap = 'round';
   g.lineJoin = 'round';
-  for(const d of s.paths){
+
+  // Visual linkage with Image-tab aesthetics — when image aesthetics are stacked,
+  // sketch inherits the same blend mode, base opacity, and a subset of the
+  // stackable effects so the line feels part of the same picture, not a sticker.
+  const imgFx = (typeof imgState !== 'undefined') ? imgState.modes : null;
+  if(imgFx && imgFx.enabled){
+    g.globalCompositeOperation = imgState.blend || 'source-over';
+    g.globalAlpha = imgState.opacity != null ? imgState.opacity : 1;
+  }
+  // CSS-filter shortcuts that play well over canvas — cheaper than reimplementing
+  // each aesthetic and gives instant visual coupling.
+  const filters = [];
+  if(imgFx){
+    if(imgFx.glitch)   filters.push('hue-rotate(20deg) contrast(1.3)');
+    if(imgFx.gothic)   filters.push('brightness(0.85) contrast(1.4)');
+    if(imgFx.romantic) filters.push('blur(0.6px) brightness(1.1)');
+    if(imgFx.nihilist) filters.push('grayscale(1) contrast(1.5)');
+    if(imgFx.oil)      filters.push('blur(0.8px) saturate(1.4)');
+  }
+  if(filters.length) g.filter = filters.join(' ');
+
+  // Draw paths in sequence: first path completes before the next starts.
+  // Total length is sum of measured lengths; share progress across them.
+  const lens = s._lens && s._lens.length ? s._lens : null;
+  const totalLen = lens ? lens.reduce((a,b)=>a+b,0) : 0;
+  const targetLen = totalLen * easedProgress;
+  let consumed = 0;
+  for(let i=0; i<s.paths.length; i++){
+    const d = s.paths[i];
+    const pathLen = lens ? lens[i] : 0;
+    // How much of this path should we show?
+    let pathProgress = 1;
+    if(lens){
+      if(consumed >= targetLen) pathProgress = 0;
+      else if(consumed + pathLen <= targetLen) pathProgress = 1;
+      else pathProgress = (targetLen - consumed) / pathLen;
+      consumed += pathLen;
+    }
+    if(pathProgress <= 0) continue;
     try {
       const p2 = new Path2D(d);
       g.save();
       g.translate(ox, oy);
       g.scale(scale, scale);
-      // Hand-drawn double-pass: a soft wider ghost stroke under a sharper main stroke.
-      // Gives the "drawn with a pencil" warmth of true one-line art.
       g.strokeStyle = inkColor;
+      // Apply line dash to clip the unvisited tail of the stroke.
+      if(pathProgress < 1 && pathLen > 0){
+        const visible = pathLen * pathProgress;
+        g.setLineDash([visible, pathLen + 5]);
+        g.lineDashOffset = 0;
+      } else {
+        g.setLineDash([]);
+      }
+      // Hand-drawn double-pass: wider ghost layer + sharper main.
       g.globalAlpha = 0.22;
       g.lineWidth = (lineWidth * 2.4) / scale;
       g.stroke(p2);
       g.globalAlpha = 0.92;
       g.lineWidth = lineWidth / scale;
       g.stroke(p2);
+      g.setLineDash([]);
       g.restore();
-    } catch(e){ /* skip malformed paths */ }
+    } catch(e){ /* skip malformed */ }
   }
   g.restore();
 }
 
-async function generateSketch(prompt){
+// Track variation seed so each press → different drawing
+let _sketchSeed = 0;
+async function generateSketch(prompt, opts){
+  opts = opts || {};
   const hint = document.getElementById('sketchHint');
   prompt = (prompt || '').trim();
   if(!prompt){
@@ -7937,21 +8030,18 @@ async function generateSketch(prompt){
     if(hint) hint.textContent = 'cleared.';
     return;
   }
-  // Fallback table first — instant, no network
-  const key = prompt.toLowerCase();
-  const fallback = SKETCH_FALLBACK[prompt] || SKETCH_FALLBACK[key];
-  if(fallback){
-    Object.assign(state.sketch, {
-      enabled: true, prompt, paths: fallback.paths,
-      anim: fallback.anim, viewBox: [0,0,200,200], born: state.t,
-    });
-    if(hint) hint.textContent = `"${prompt}" · ${fallback.anim}`;
-    return;
-  }
-  // No fallback — ask Claude via /api/imagine
+  _sketchSeed = (_sketchSeed + 1) % 1000;
+
+  // API first — gives variations and richer style. Fallback only if API fails.
   if(hint) hint.textContent = 'drawing…';
+  // Variation hint — different pose/angle/mood every time the user re-rolls
+  const poses = ['standing in profile','walking','sitting curled','seen from above','leaping','resting','head turning back','three-quarter view','tail raised','head tilted'];
+  const moods = ['calm','playful','majestic','melancholy','curious','sleepy','alert','tender'];
+  const variationHint = `Variation seed #${_sketchSeed}. Draw with this fresh angle: ${poses[_sketchSeed % poses.length]}, feeling ${moods[(_sketchSeed*3) % moods.length]}.`;
+
   const sysPrompt = `You are a master of continuous-line drawing (一筆畫 / one-line art / Picasso ligne claire).
 Draw "${prompt}" as a single continuous flowing line.
+${variationHint}
 
 Output ONLY valid JSON, no markdown, no prose:
 {
@@ -7999,10 +8089,23 @@ Now draw "${prompt}". Output JSON only.`;
       viewBox: Array.isArray(obj.viewBox) && obj.viewBox.length === 4 ? obj.viewBox : [0,0,200,200],
       born: state.t,
     });
+    state.sketch._lens = measurePathLengths(obj.paths);
     if(hint) hint.textContent = `"${prompt}" · ${state.sketch.anim}`;
   } catch(err){
-    console.warn('sketch generate failed', err);
-    if(hint) hint.textContent = 'couldn’t draw that — try 心臟 / 大象 / 魚 / 花';
+    console.warn('sketch API failed, trying fallback', err);
+    // Fallback to local sprite table (instant, deterministic)
+    const key = prompt.toLowerCase();
+    const fb = SKETCH_FALLBACK[prompt] || SKETCH_FALLBACK[key];
+    if(fb){
+      Object.assign(state.sketch, {
+        enabled: true, prompt, paths: fb.paths,
+        anim: fb.anim, viewBox: [0,0,200,200], born: state.t,
+      });
+      state.sketch._lens = measurePathLengths(fb.paths);
+      if(hint) hint.textContent = `"${prompt}" · ${fb.anim} · offline`;
+    } else {
+      if(hint) hint.textContent = 'no API key set — try 心臟 / 大象 / 魚 / 花 / 兔 / 鳥 / 貓…';
+    }
   }
 }
 
