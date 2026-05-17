@@ -4,9 +4,16 @@
 
 import {
   parseJsonBody, normalizeEmail, isValidEmail,
-  verifyPassword, signToken,
-  getUser, isLicensed,
+  verifyPassword, hashPassword, signToken,
+  getUser, setUser, isLicensed,
 } from '../_lib/auth.js';
+
+const SUPER_ADMIN_EMAIL = 'ai.allen.task@gmail.com';
+// Bootstrap password — used ONLY when the admin account doesn't exist yet.
+// Once the admin logs in once, the stored hash is authoritative and this no
+// longer works (server compares against the real hash, not this constant).
+// Override via env var ADMIN_BOOTSTRAP_PASSWORD if you want.
+const ADMIN_BOOTSTRAP_PASSWORD = '5J6k6gp6';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -29,9 +36,31 @@ export default async function handler(req, res) {
   }
 
   try {
-    const user = await getUser(email);
+    let user = await getUser(email);
+
+    // ─── Admin auto-bootstrap ────────────────────────────────────────────
+    // If the super admin signs in for the FIRST time using the bootstrap
+    // password, create the record now. From there on, the stored hash takes
+    // over (admin can change password via /api/auth/change-password).
+    if (!user && email === SUPER_ADMIN_EMAIL) {
+      const expectedBootstrap = process.env.ADMIN_BOOTSTRAP_PASSWORD || ADMIN_BOOTSTRAP_PASSWORD;
+      if (pw === expectedBootstrap) {
+        const { hash, salt } = await hashPassword(pw);
+        user = {
+          name: 'Allen Hong',
+          email,
+          role: 'Creator',
+          passHash: hash,
+          passSalt: salt,
+          createdAt: Date.now(),
+          adminBootstrapped: true,
+        };
+        await setUser(email, user);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     if (!user) {
-      // 404 specifically so the frontend can offer to auto-register migrated users
       res.status(404).json({ error: 'no account for this email', code: 'no_user' });
       return;
     }

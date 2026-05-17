@@ -196,6 +196,8 @@
     display:grid; grid-template-columns:1fr 1fr; gap:8px;
     margin-bottom:14px;
   }
+  .gate-buttons-3{ grid-template-columns:1fr 1fr 1fr; }
+  @media (max-width:520px){ .gate-buttons-3{ grid-template-columns:1fr; } }
   .gate-secondary{
     border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.04);
     color:var(--ink); border-radius:8px; padding:14px 8px; cursor:pointer;
@@ -227,6 +229,27 @@
   }
   .gate-switch a{ color:#c87cff; text-decoration:none; }
   .gate-switch a:hover{ text-decoration:underline; }
+  .gate-link{
+    appearance:none; background:none; border:none; padding:0; margin:0;
+    color:#c87cff; cursor:pointer; font:inherit;
+  }
+  .gate-link:hover{ text-decoration:underline; }
+  .gate-forgot-card{ text-align:center; }
+  .gate-forgot-card p{
+    color:var(--ink-soft); font-family:var(--sans); font-size:12px;
+    line-height:1.6; margin:14px 0;
+  }
+  .gate-forgot-card .copy-line{
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.10);
+    padding:8px 14px; border-radius:8px; margin-top:6px;
+    font-family:var(--mono),monospace; font-size:12px; color:var(--ink);
+  }
+  .gate-forgot-card .copy-line button{
+    appearance:none; border:none; background:rgba(200,124,255,.25);
+    color:var(--ink); padding:2px 8px; border-radius:5px; cursor:pointer;
+    font-family:var(--sans); font-size:10px; letter-spacing:.06em;
+  }
   .gate-err{
     background:rgba(255,80,110,.10); border:1px solid rgba(255,80,110,.35);
     color:#ffadc0; padding:8px 10px; border-radius:7px;
@@ -263,6 +286,52 @@
     transition: background .12s, color .12s;
   }
   .user-chip .logout:hover{ background:rgba(255,80,110,.18); color:#ffadc0; }
+  .user-chip .user-main{
+    appearance:none; background:none; border:none; padding:0;
+    display:flex; align-items:center; gap:10px; cursor:pointer;
+    color:inherit;
+  }
+
+  /* Account dropdown */
+  .user-menu{
+    position:fixed; right:18px; top:52px; z-index:6;
+    background:rgba(8,8,14,.92); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,.10); border-radius:10px;
+    padding:6px; min-width:200px;
+    box-shadow:0 12px 32px rgba(0,0,0,.45);
+    display:flex; flex-direction:column; gap:2px;
+  }
+  .user-menu.hidden{ display:none; }
+  .user-menu-item{
+    appearance:none; border:none; background:transparent;
+    color:var(--ink); text-align:left; cursor:pointer;
+    padding:8px 12px; border-radius:6px; font-family:var(--sans); font-size:12px;
+    display:flex; align-items:center; gap:9px;
+    transition: background .12s;
+  }
+  .user-menu-item:hover{ background:rgba(255,255,255,.07); }
+  .user-menu-item .ico{ font-size:13px; opacity:.7; width:16px; text-align:center; }
+
+  /* Generic modal */
+  .modal-backdrop{
+    position:fixed; inset:0; z-index:9000;
+    background:rgba(0,0,0,.55); backdrop-filter:blur(12px);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .modal-backdrop.hidden{ display:none; }
+  .modal-card{
+    background:rgba(18,18,28,.92); border:1px solid rgba(255,255,255,.10);
+    border-radius:12px; padding:30px 30px 26px; width:90%; max-width:380px;
+    box-shadow:0 24px 64px rgba(0,0,0,.55);
+  }
+  .modal-title{
+    font-family:'Instrument Serif',serif; font-style:italic;
+    font-size:24px; color:var(--ink); margin-bottom:2px;
+  }
+  .modal-sub{
+    font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--ink-soft); opacity:.7; margin-bottom:18px;
+  }
 
   /* Preview-mode CTA — small chip pinned top-center when user is browsing as guest */
   .preview-cta{
@@ -814,14 +883,18 @@
         <div>Camera face / hand FX · typography · AI line-art glyphs</div>
         <div>MIDI controller input · VJ hotkeys · LFO · A/B crossfade</div>
       </div>
-      <div class="gate-buttons">
+      <div class="gate-buttons gate-buttons-3">
         <button class="gate-secondary" id="gateTryBtn" type="button">
           <span class="big">Try preview</span>
           <span class="hint">試用 · Random only</span>
         </button>
+        <button class="gate-secondary" id="gateSignInBtn" type="button">
+          <span class="big">Sign in</span>
+          <span class="hint">登入 · 已有帳號</span>
+        </button>
         <button class="gate-submit" id="gateRegisterBtn" type="button">
-          <span class="big">Register / Sign in</span>
-          <span class="hint">註冊 / 登入 · 完整功能</span>
+          <span class="big">Register</span>
+          <span class="hint">註冊 · 新帳號</span>
         </button>
       </div>
       <div class="gate-foot">
@@ -855,10 +928,32 @@
         <button class="gate-submit" type="submit">Create account</button>
       </form>
       <div class="gate-back" id="gateBackBtn">← back to welcome</div>
-      <div class="gate-switch">already have an account? <a href="#" id="gateSwitchLogin">sign in</a></div>
+      <div class="gate-switch">already have an account? <button type="button" class="gate-link" id="gateSwitchLogin">sign in</button></div>
       <div class="gate-foot">
-        <span style="opacity:.7">Account data stored locally on this device. Password is hashed (SHA-256). No cloud sync yet — different device = re-register.</span>
+        <span style="opacity:.7">Account stored in our server (Upstash Redis). Password is hashed with PBKDF2-SHA256 (100k rounds, salted). Sign in from any device with the same email + password.</span>
       </div>
+    </div>
+
+    <!-- Stage 3: Forgot password (hidden initially) -->
+    <div class="gate-card gate-forgot-card" id="gateForgot" style="display:none">
+      <div class="gate-title">Forgot password?</div>
+      <div class="gate-subtitle">password recovery · 密碼救援</div>
+      <p>
+        Email-based password reset isn't built yet. To get a new password right now:
+      </p>
+      <ol style="text-align:left;font-family:var(--sans);font-size:11.5px;color:var(--ink-soft);line-height:1.8;padding-left:20px">
+        <li>Email <strong style="color:#c87cff">ai.allen.task@gmail.com</strong> from the address you registered with.</li>
+        <li>Allen will reset it in the admin panel and reply with a new temp password.</li>
+        <li>Sign in with the new password, then change it from the admin chip top-right.</li>
+      </ol>
+      <div class="copy-line">
+        <span>ai.allen.task@gmail.com</span>
+        <button type="button" id="gateForgotCopy">copy</button>
+      </div>
+      <p style="opacity:.55;font-size:10.5px;margin-top:18px">
+        Forgot you registered? Your local browser data shows: <span id="gateForgotHint" style="color:var(--ink)">—</span>
+      </p>
+      <div class="gate-back" id="gateForgotBack">← back to sign in</div>
     </div>
 
     <!-- Stage 2b: Login (returning user, hidden initially) -->
@@ -878,9 +973,13 @@
         <button class="gate-submit" type="submit">Sign in</button>
       </form>
       <div class="gate-back" id="gateLoginBackBtn">← back to welcome</div>
-      <div class="gate-switch">no account yet? <a href="#" id="gateSwitchRegister">create one</a></div>
+      <div class="gate-switch">
+        no account yet? <button type="button" class="gate-link" id="gateSwitchRegister">create one</button>
+        <span style="opacity:.5">·</span>
+        <button type="button" class="gate-link" id="gateForgotBtn">forgot password?</button>
+      </div>
       <div class="gate-foot">
-        <span style="opacity:.7">Forgot password? Account data is local to this browser — clear it &amp; re-register, or contact <a href="mailto:ai.allen.task@gmail.com" style="color:#c87cff">ai.allen.task@gmail.com</a>.</span>
+        <span style="opacity:.7">Sign in works from any device with the same credentials.</span>
       </div>
     </div>
 
@@ -895,14 +994,53 @@
     <span class="glyph">●</span><span>preview mode · register for full access</span>
   </button>
 
-  <!-- User chip — top right, shows current logged-in user + logout -->
+  <!-- User chip — top right, shows current logged-in user + menu -->
   <div class="user-chip hidden" id="userChip" title="Logged in">
-    <div class="ava" id="userAva">?</div>
-    <div class="meta">
-      <span class="name" id="userName">—</span>
-      <span class="role" id="userRole">—</span>
-    </div>
+    <button class="user-main" id="userMenuBtn" type="button" title="Account menu">
+      <div class="ava" id="userAva">?</div>
+      <div class="meta">
+        <span class="name" id="userName">—</span>
+        <span class="role" id="userRole">—</span>
+      </div>
+    </button>
     <button class="logout" id="userLogout" type="button" title="Sign out">⏻</button>
+  </div>
+
+  <!-- Account dropdown menu (anchored under user chip) -->
+  <div class="user-menu hidden" id="userMenu">
+    <button class="user-menu-item" id="userMenuChangePw" type="button">
+      <span class="ico">🔑</span><span>Change password · 改密碼</span>
+    </button>
+    <button class="user-menu-item" id="userMenuSignOut" type="button">
+      <span class="ico">⏻</span><span>Sign out · 登出</span>
+    </button>
+  </div>
+
+  <!-- Change password modal -->
+  <div class="modal-backdrop hidden" id="changePwBackdrop">
+    <div class="modal-card">
+      <div class="modal-title">Change password</div>
+      <div class="modal-sub">改密碼</div>
+      <form id="changePwForm" autocomplete="off">
+        <div class="gate-field">
+          <label for="cpCurrent">Current password · 目前密碼</label>
+          <input id="cpCurrent" type="password" required minlength="1" autocomplete="current-password" />
+        </div>
+        <div class="gate-field">
+          <label for="cpNew">New password · 新密碼 (min 6 chars)</label>
+          <input id="cpNew" type="password" required minlength="6" autocomplete="new-password" />
+        </div>
+        <div class="gate-field">
+          <label for="cpConfirm">Confirm new password · 再輸入一次</label>
+          <input id="cpConfirm" type="password" required minlength="6" autocomplete="new-password" />
+        </div>
+        <div class="gate-err" id="cpErr" style="display:none"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+          <button type="button" class="gate-secondary" id="cpCancel">Cancel</button>
+          <button type="submit" class="gate-submit">Save</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- Author footer — © Allen Hong + IG link -->
@@ -6455,6 +6593,8 @@ function randomSalt(){
     welcome.style.display  = 'none';
     register.style.display = 'none';
     login.style.display    = 'none';
+    const fv = document.getElementById('gateForgot');
+    if(fv) fv.style.display = 'none';
   }
   function showWelcome(){
     hideAllViews();
@@ -6513,41 +6653,57 @@ function randomSalt(){
       if(res.ok && res.data.user){
         applyUserChip(res.data.user);
         applyLicense({ ...res.data.user, licensed: res.data.user.licensed });
-        // Update local cache
         try { localStorage.setItem(GATE_KEY, JSON.stringify({ ...res.data.user, registeredAt: existing ? existing.registeredAt : Date.now() })); } catch(_){}
         hideGate();
         return;
       }
-      // token bad → wipe and fall through
       clearToken();
     }
-    // No token. If we have legacy local data → show login (returning user feel).
-    if(existing){
-      showLogin(existing.email);
-    } else {
-      showWelcome();
-    }
+    // No valid token → always greet with Welcome.
+    // The Sign in button auto-routes to login form (with email prefilled) if local data exists.
+    showWelcome();
   }
   bootstrapSession();
 
-  // ——— Stage-1 buttons ———
+  // ——— Forgot password view ———
+  const forgotView = document.getElementById('gateForgot');
+  function showForgot(){
+    hideAllViews();
+    if(forgotView) forgotView.style.display = '';
+    overlay.classList.remove('hidden');
+    const ex = getRegisteredUser();
+    const hint = document.getElementById('gateForgotHint');
+    if(hint) hint.textContent = ex && ex.email ? ex.email : 'no local record';
+  }
+
+  // ——— Welcome stage buttons ———
+  const signInBtn = document.getElementById('gateSignInBtn');
   if(tryBtn) tryBtn.addEventListener('click', () => {
     state.previewMode = true;
     hideGate();
     if(previewCta) previewCta.classList.remove('hidden');
   });
-  if(regBtn) regBtn.addEventListener('click', () => {
-    // If a user already exists locally → default to login. Otherwise register.
-    const ex = getRegisteredUser();
-    if(ex) showLogin(); else showRegister();
-  });
+  if(signInBtn) signInBtn.addEventListener('click', () => { showLogin(); });
+  if(regBtn) regBtn.addEventListener('click', () => { showRegister(); });
   if(backBtn) backBtn.addEventListener('click', () => { showWelcome(); });
   if(loginBack) loginBack.addEventListener('click', () => { showWelcome(); });
-  if(switchLogin) switchLogin.addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
-  if(switchRegister) switchRegister.addEventListener('click', (e) => { e.preventDefault(); showRegister(); });
+  if(switchLogin) switchLogin.addEventListener('click', () => { showLogin(); });
+  if(switchRegister) switchRegister.addEventListener('click', () => { showRegister(); });
   if(previewCta) previewCta.addEventListener('click', () => {
     const ex = getRegisteredUser();
     if(ex) showLogin(); else showRegister();
+  });
+
+  // ——— Forgot password wiring ———
+  const forgotBtn = document.getElementById('gateForgotBtn');
+  const forgotBack = document.getElementById('gateForgotBack');
+  const forgotCopy = document.getElementById('gateForgotCopy');
+  if(forgotBtn) forgotBtn.addEventListener('click', () => { showForgot(); });
+  if(forgotBack) forgotBack.addEventListener('click', () => { showLogin(); });
+  if(forgotCopy) forgotCopy.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText('ai.allen.task@gmail.com'); forgotCopy.textContent = 'copied'; }
+    catch(_){ forgotCopy.textContent = 'manual copy'; }
+    setTimeout(() => { forgotCopy.textContent = 'copy'; }, 1500);
   });
 
   function setBtnLoading(btnEl, loading, originalText){
@@ -6665,20 +6821,91 @@ function clearUserChip(){
   const chip = document.getElementById('userChip');
   if(chip) chip.classList.add('hidden');
 }
-// Wire logout
+// Wire user-chip account menu + change password
 (function(){
-  const btn = document.getElementById('userLogout');
-  if(!btn) return;
-  btn.addEventListener('click', () => {
+  const chip       = document.getElementById('userChip');
+  const menuBtn    = document.getElementById('userMenuBtn');
+  const menu       = document.getElementById('userMenu');
+  const logoutBtn  = document.getElementById('userLogout');
+  const menuOut    = document.getElementById('userMenuSignOut');
+  const menuChange = document.getElementById('userMenuChangePw');
+  const backdrop   = document.getElementById('changePwBackdrop');
+  const form       = document.getElementById('changePwForm');
+  const cancel     = document.getElementById('cpCancel');
+  const errEl      = document.getElementById('cpErr');
+
+  function doSignOut(){
     if(!confirm('Sign out? You can sign back in with the same email + password.')) return;
     clearToken();
     try { localStorage.removeItem(LICENSE_KEY); } catch(_){}
-    // keep iw-user-v1 as a hint for the login screen (email prefill)
     state.noWatermark = false;
     state.licenseInfo = null;
     clearUserChip();
     location.reload();
+  }
+  if(logoutBtn) logoutBtn.addEventListener('click', doSignOut);
+  if(menuOut) menuOut.addEventListener('click', doSignOut);
+
+  // Toggle dropdown
+  if(menuBtn) menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menu.classList.toggle('hidden');
   });
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    if(!menu || menu.classList.contains('hidden')) return;
+    if(menu.contains(e.target) || (chip && chip.contains(e.target))) return;
+    menu.classList.add('hidden');
+  });
+
+  // Open change-password modal
+  if(menuChange) menuChange.addEventListener('click', () => {
+    if(menu) menu.classList.add('hidden');
+    if(!backdrop) return;
+    backdrop.classList.remove('hidden');
+    document.getElementById('cpCurrent').value = '';
+    document.getElementById('cpNew').value = '';
+    document.getElementById('cpConfirm').value = '';
+    if(errEl) errEl.style.display = 'none';
+    setTimeout(() => document.getElementById('cpCurrent').focus(), 80);
+  });
+  if(cancel) cancel.addEventListener('click', () => { if(backdrop) backdrop.classList.add('hidden'); });
+  if(backdrop) backdrop.addEventListener('click', (e) => {
+    if(e.target === backdrop) backdrop.classList.add('hidden');
+  });
+
+  // Submit change-password
+  if(form) form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const cur = document.getElementById('cpCurrent').value;
+    const nw  = document.getElementById('cpNew').value;
+    const cf  = document.getElementById('cpConfirm').value;
+    if(!cur || !nw || !cf){ showCpErr('fill in every field.'); return; }
+    if(nw.length < 6){ showCpErr('new password must be at least 6 characters.'); return; }
+    if(nw !== cf){ showCpErr('new password and confirmation don\'t match.'); return; }
+    if(nw === cur){ showCpErr('new password must differ from current.'); return; }
+
+    if(submitBtn){ submitBtn._origText = submitBtn.textContent; submitBtn.disabled = true; submitBtn.textContent = 'saving…'; }
+    const res = await apiFetch('/api/auth/change-password', { currentPassword: cur, newPassword: nw });
+    if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = submitBtn._origText || 'Save'; }
+
+    if(!res.ok){
+      showCpErr((res.data && res.data.error) || ('server error · ' + res.status));
+      return;
+    }
+    // New token from server — store it so the session continues
+    if(res.data.token) setToken(res.data.token);
+    backdrop.classList.add('hidden');
+    // tiny success indicator
+    const chip2 = document.getElementById('userChip');
+    if(chip2){
+      chip2.style.transition = 'box-shadow .4s';
+      chip2.style.boxShadow = '0 0 0 3px rgba(155,211,167,.5)';
+      setTimeout(() => chip2.style.boxShadow = '', 1200);
+    }
+  });
+  function showCpErr(msg){ if(errEl){ errEl.textContent = msg; errEl.style.display = ''; } }
 })();
 
 // Preview-mode click interceptor — capture-phase. Only blocks USER events
