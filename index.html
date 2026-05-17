@@ -9541,8 +9541,8 @@ document.getElementById('kaleidoLink').addEventListener('change', e => {
 
 <!-- Floating bottom-right FABs: Random + Present -->
 <div class="floating-fab" id="floatingFab">
-  <button class="fab-btn" id="fabPresent" title="Presentation mode" aria-label="Present">📺</button>
-  <button class="fab-btn primary" id="fabRandom" title="Randomize" aria-label="Random">🎲</button>
+  <button class="fab-btn" id="fabPresent" title="Presentation mode" aria-label="Present" onclick="window._fabPresent && window._fabPresent()">📺</button>
+  <button class="fab-btn primary" id="fabRandom" title="Randomize" aria-label="Random" onclick="window._fabRandom && window._fabRandom()">🎲</button>
 </div>
 <script>
 /* —— Floating buttons + Presentation mode ——————————————————————— */
@@ -9645,35 +9645,29 @@ setTimeout(() => { const h = document.getElementById('h'); if(h) h.classList.add
     if(presentWin && !presentWin.closed){ try{ presentWin.close(); }catch(_){} }
   }
 
-  console.log('[IW] FAB IIFE booted — delegation registered');
-
-  // Robust document delegation — survives obfuscation + IIFE order + late DOM updates.
-  // Call randomizeAll() directly instead of going through button.click() to avoid
-  // capture-phase interceptors swallowing the synthetic event.
-  document.addEventListener('click', (e) => {
-    const t = e.target;
-    if(!t || !t.closest) return;
-    if(t.closest('#fabRandom')){
-      console.log('[IW] fabRandom clicked');
-      if(typeof randomizeAll === 'function'){
-        randomizeAll();
-      } else {
-        const btn = $('randomize');
-        if(btn) btn.click();
-        else console.warn('[IW] randomizeAll missing AND #randomize button missing');
-      }
-      return;
+  // Expose to inline onclick attributes on the FAB buttons.
+  // Inline onclick is the most reliable wiring path — it doesn't depend on
+  // capture-phase event interceptors, document.addEventListener registration
+  // order, obfuscation, or anything else. Buttons just work.
+  window._fabRandom = function(){
+    console.log('[IW] fabRandom invoked');
+    if(typeof randomizeAll === 'function'){
+      randomizeAll();
+    } else {
+      const btn = document.getElementById('randomize');
+      if(btn) btn.click();
+      else console.warn('[IW] randomizeAll missing AND #randomize button missing');
     }
-    if(t.closest('#fabPresent')){
-      console.log('[IW] fabPresent clicked, presentWin:', presentWin);
-      try {
-        if(presentWin && !presentWin.closed) closePresent(); else openPresent();
-      } catch(err){
-        console.error('[IW] present failed:', err);
-      }
-      return;
+  };
+  window._fabPresent = function(){
+    console.log('[IW] fabPresent invoked, presentWin:', presentWin);
+    try {
+      if(presentWin && !presentWin.closed) closePresent(); else openPresent();
+    } catch(err){
+      console.error('[IW] present failed:', err);
     }
-  });
+  };
+  console.log('[IW] FAB handlers exposed on window');
 })();
 
 /* ════════════════════════════════════════════════════════════════════════════
