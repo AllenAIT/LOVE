@@ -3890,6 +3890,54 @@ window._refreshLyricCaption = function(){
   const el = document.getElementById('lyricsCaptionOverlay');
   if(el && el.style.display !== 'none') _applyCaptionStyleFromTypo(el);
 };
+// Poll every 200ms while caption visible so Type tab changes apply in real time
+// (font/color/weight/anim swap shows up immediately, not only on next lyric line).
+setInterval(() => {
+  const el = document.getElementById('lyricsCaptionOverlay');
+  if(el && el.style.display !== 'none' && el.style.opacity !== '0'){
+    _applyCaptionStyleFromTypo(el);
+  }
+}, 200);
+
+// Diagnostic HUD — shows audio time + current lyric line index so the user can
+// see at a glance whether sync is advancing or stuck.
+function _ensureLyricsHUD(){
+  let el = document.getElementById('lyricsSyncHUD');
+  if(el && el.isConnected) return el;
+  el = document.createElement('div');
+  el.id = 'lyricsSyncHUD';
+  el.style.cssText = [
+    'position:fixed !important','top:8px !important','left:8px !important',
+    'padding:6px 10px !important','border-radius:8px !important',
+    'background:rgba(0,0,0,.55) !important','color:#9bd3a7 !important',
+    'font-family:ui-monospace,"SF Mono",Menlo,monospace !important',
+    'font-size:11px !important','letter-spacing:.04em !important',
+    'z-index:2147483640 !important','pointer-events:none !important',
+    'display:none','white-space:pre','user-select:none',
+    'border:1px solid rgba(155,211,167,.25) !important'
+  ].join(';');
+  (document.documentElement || document.body).appendChild(el);
+  return el;
+}
+function _updateLyricsHUD(){
+  try {
+    if(typeof lyrics === 'undefined' || !lyrics.enabled || !lyrics.lines.length){
+      const h = document.getElementById('lyricsSyncHUD');
+      if(h) h.style.display = 'none';
+      return;
+    }
+    const el = _ensureLyricsHUD();
+    const ar = typeof reactor !== 'undefined' ? reactor.mediaEl : null;
+    const t = ar ? ar.currentTime : 0;
+    const paused = ar ? ar.paused : true;
+    const idx = lyrics.currentIdx;
+    const next = lyrics.lines[idx + 1];
+    const nextIn = next ? Math.max(0, next.time - t).toFixed(1) + 's' : '—';
+    el.textContent = `♪ ${paused ? 'PAUSED' : 'PLAY'} ${t.toFixed(2)}s · line ${idx+1}/${lyrics.lines.length} · next in ${nextIn}`;
+    el.style.display = 'block';
+  } catch(_){}
+}
+setInterval(_updateLyricsHUD, 250);
 // Inject CSS keyframes for caption anims (once)
 (function _injectCaptionAnimCSS(){
   if(document.getElementById('iwCaptionAnimCSS')) return;
@@ -9428,6 +9476,16 @@ wireTypeSlider('typeRate','typeRateFill','typeRateThumb','typeRateVal','rate', v
 wireTypeSlider('typeLife','typeLifeFill','typeLifeThumb','typeLifeVal','life', v => v.toFixed(1)+'s',  v => v/10);
 wireTypeSlider('typeDens','typeDensFill','typeDensThumb','typeDensVal','density', v => v.toFixed(2),   v => v/100);
 $('typeLoop').addEventListener('change', e => { typo.loop = e.target.checked; });
+
+// Whenever any Type tab control changes, sync the lyric caption styling
+// immediately (don't wait for the next 200ms poll or the next lyric line).
+(function _wireTypeCaptionLiveSync(){
+  const typeTab = document.querySelector('section.tab[data-tab="type"]') || document.body;
+  const sync = () => { if(typeof window._refreshLyricCaption === 'function') window._refreshLyricCaption(); };
+  typeTab.addEventListener('click', sync, true);
+  typeTab.addEventListener('input', sync, true);
+  typeTab.addEventListener('change', sync, true);
+})();
 
 /* —————————————————————————————————————————————————————————————————————
    Phrase library (localStorage) + typing simulator
