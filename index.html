@@ -1547,6 +1547,42 @@
         </div>
 
         <div class="section">
+          <h3 class="section-title">Lyrics sync <em style="font-size:11px;color:var(--ink-faint);font-style:normal;letter-spacing:.12em;text-transform:uppercase;margin-left:6px">歌詞 · auto-fetch + visual mapping</em></h3>
+          <div style="display:flex;gap:6px;align-items:stretch;margin-bottom:6px">
+            <input id="lyricsSearch" type="text" placeholder="song title — artist (e.g. fly me to the moon — frank sinatra)"
+                   style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--ink);border-radius:7px;padding:8px 10px;font-family:var(--sans);font-size:12px;outline:none" />
+            <button class="audio-btn" id="lyricsFetch">Fetch</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <button class="audio-btn" id="lyricsToggle" style="flex:1">Off</button>
+            <button class="audio-btn" id="lyricsPaste" title="Paste LRC manually">Paste LRC</button>
+            <button class="audio-btn danger" id="lyricsClear" title="Clear loaded lyrics">✕</button>
+          </div>
+          <div class="audio-note" id="lyricsStatus" style="margin-bottom:6px">no lyrics loaded</div>
+          <div class="ctrl"><span class="label">Fallback: switch every N lines</span><span class="val" id="lyricsEveryVal">5</span>
+            <div class="slider"><div class="track"></div><div class="fill" id="lyricsEveryFill"></div><div class="thumb" id="lyricsEveryThumb"></div>
+              <input type="range" min="2" max="12" value="5" id="lyricsEvery" />
+            </div>
+          </div>
+          <div class="ctrl"><span class="label">Instrumental gap (sec)</span><span class="val" id="lyricsGapVal">4</span>
+            <div class="slider"><div class="track"></div><div class="fill" id="lyricsGapFill"></div><div class="thumb" id="lyricsGapThumb"></div>
+              <input type="range" min="2" max="15" value="4" id="lyricsGap" />
+            </div>
+          </div>
+          <div class="ctrl"><span class="label">Gap switch interval</span><span class="val" id="lyricsGapIntVal">2.5s</span>
+            <div class="slider"><div class="track"></div><div class="fill" id="lyricsGapIntFill"></div><div class="thumb" id="lyricsGapIntThumb"></div>
+              <input type="range" min="10" max="80" value="25" id="lyricsGapInt" />
+            </div>
+          </div>
+          <div class="type-tip" style="margin-top:4px">
+            Auto-fetches synced lyrics, shows them as typography, and switches the visual
+            on <strong>verse → chorus → bridge transitions</strong> (detected by repeated lines).
+            Fallback timer above kicks in only if a section runs long without a transition.
+            Instrumental gaps trigger faster switches.
+          </div>
+        </div>
+
+        <div class="section">
           <h3 class="section-title">Recording <em style="font-size:11px;color:var(--ink-faint);font-style:normal;letter-spacing:.12em;text-transform:uppercase;margin-left:6px">output resolution</em></h3>
           <div class="seg" id="recQualitySeg" style="grid-template-columns:repeat(3,1fr)">
             <button data-q="720" class="on">720p<em>免費</em></button>
@@ -1882,25 +1918,109 @@ document.addEventListener('click', (e) => {
   const id = (t && t.id) || (t && t.closest('[id]') && t.closest('[id]').id) || '(no id)';
   console.log('[IW] click @', tag, '· closest-id:', id, '· trusted:', e.isTrusted, '· phase: capture');
 
-  // Belt-and-suspenders FAB binding from inside the first script (we know this runs).
-  // Acts even if the second script's IIFE fails or the inline onclick is stripped.
+  // First-script FAB handlers — self-contained. Don't depend on second script's IIFE.
   if(t && t.closest){
     if(t.closest('#fabRandom')){
-      console.log('[IW] capture-handler routing → fabRandom');
       e.stopPropagation();
       if(typeof randomizeAll === 'function') randomizeAll();
-      else console.warn('[IW] randomizeAll() not defined yet');
       return;
     }
     if(t.closest('#fabPresent')){
-      console.log('[IW] capture-handler routing → fabPresent');
       e.stopPropagation();
-      if(typeof window._fabPresent === 'function') window._fabPresent();
-      else console.warn('[IW] window._fabPresent() not exposed yet — second script may have failed');
+      _togglePresent();
       return;
     }
   }
 }, true);
+
+// Self-contained Present-mode toggle. Opens a popup on the secondary display
+// (if present), streams the canvas via captureStream. State is module-local
+// so we don't depend on any other script's IIFE.
+const _presentState = { win: null, stream: null, watcher: null };
+async function _togglePresent(){
+  if(_presentState.win && !_presentState.win.closed){
+    try { _presentState.win.close(); } catch(_){}
+    return;
+  }
+  if(typeof cv === 'undefined' || !cv.captureStream){
+    alert('This browser does not support canvas streaming.');
+    return;
+  }
+  // Try to position the popup on a secondary screen if available
+  let features = 'width=1280,height=720,resizable=yes,toolbar=no,location=no';
+  try {
+    if(window.getScreenDetails){
+      const det = await window.getScreenDetails();
+      const ext = det.screens.find(s => !s.isPrimary);
+      if(ext){
+        features += `,left=${ext.left},top=${ext.top},width=${ext.width},height=${ext.height}`;
+      }
+    }
+  } catch(_){}
+  const popup = window.open('about:blank', 'iw-present-' + Date.now(), features);
+  if(!popup){
+    alert('Pop-up blocked. Allow pop-ups for this site, then click Present again.');
+    return;
+  }
+  _presentState.win = popup;
+  const html = '<!doctype html><html><head><meta charset="utf-8"/>'
+    + '<title>Inner Weather — Present</title>'
+    + '<style>html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}'
+    + 'video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;background:#000}'
+    + '.hint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);color:rgba(255,255,255,.5);'
+    + 'font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:11px;letter-spacing:.16em;'
+    + 'text-transform:uppercase;background:rgba(0,0,0,.4);padding:6px 14px;border-radius:999px;'
+    + 'backdrop-filter:blur(10px);transition:opacity .8s;pointer-events:none}'
+    + '.hint.gone{opacity:0}</style></head><body>'
+    + '<video id="v" autoplay playsinline></video>'
+    + '<div class="hint" id="h">Click to fullscreen · Esc closes · F toggles</div>'
+    + '<scr' + 'ipt>'
+    + 'document.addEventListener("click",function(){if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen()});'
+    + 'window.addEventListener("keydown",function(e){if(e.key==="Escape")window.close();if(e.key==="f"||e.key==="F"){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}});'
+    + 'setTimeout(function(){var h=document.getElementById("h");if(h)h.classList.add("gone")},4000);'
+    + '</scr' + 'ipt></body></html>';
+  popup.document.open();
+  popup.document.write(html);
+  popup.document.close();
+  await new Promise(r => setTimeout(r, 100));
+  try {
+    const stream = cv.captureStream(60);
+    try {
+      if(typeof reactor !== 'undefined' && reactor.ac && reactor.analyser && reactor.mode !== 'off'){
+        if(!reactor._presentDest){
+          reactor._presentDest = reactor.ac.createMediaStreamDestination();
+          try { reactor.analyser.connect(reactor._presentDest); } catch(_){}
+        }
+        reactor._presentDest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+      }
+    } catch(_){}
+    _presentState.stream = stream;
+    const v = popup.document.getElementById('v');
+    v.srcObject = stream;
+    v.play().catch(()=>{});
+    const fab = document.getElementById('fabPresent');
+    if(fab){ fab.classList.add('live'); fab.textContent = '⏹'; fab.title = 'Stop presentation'; }
+  } catch(err){
+    console.error('present failed', err);
+    try { popup.close(); } catch(_){}
+    _presentState.win = null;
+    return;
+  }
+  // Watch for popup close → restore button
+  _presentState.watcher = setInterval(() => {
+    if(!_presentState.win || _presentState.win.closed){
+      clearInterval(_presentState.watcher);
+      _presentState.watcher = null;
+      _presentState.win = null;
+      try { _presentState.stream && _presentState.stream.getTracks().forEach(t => t.stop()); } catch(_){}
+      _presentState.stream = null;
+      const fab = document.getElementById('fabPresent');
+      if(fab){ fab.classList.remove('live'); fab.textContent = '📺'; fab.title = 'Presentation mode'; }
+    }
+  }, 500);
+}
+// Expose for inline onclick + bookmarklets
+window._togglePresent = _togglePresent;
 
 const EMOTIONS = [
   { id:"love",      name:"Love",      whisper:"warm & expanding",   hue:[348, 18],  sat:80, light:64, glow:"#ffb6c1", style:"bloom"    },
@@ -2492,6 +2612,7 @@ function frame(now){
   perf._lastNow = now;
   state.beatFlash *= 0.90;
   reactor.update();
+  if(typeof tickLyricsSync === 'function') tickLyricsSync();
   // auto-cycle visual modes based on music sections
   if(window._maybeAutoCycle) window._maybeAutoCycle(now);
 
@@ -3493,6 +3614,179 @@ const reactor = new AudioReactor();
 
 // expose data to render loop
 window._audioData = reactor;
+
+// ============================================================
+// Lyrics sync — fetches LRC from lrclib via /api/lyrics, detects
+// verse/chorus by repetition analysis, triggers random visuals on
+// section transitions + instrumental gaps.
+// ============================================================
+const lyrics = {
+  enabled: false,
+  lines: [],              // [{ time, text, section }]
+  currentIdx: -1,
+  currentSection: null,
+  linesSinceSwitch: 0,
+  linesPerSwitchFallback: 5,
+  instrumentalGapSec: 4,
+  instrumentalSwitchSec: 2.5,
+  _lastGapSwitch: 0,
+  meta: null,             // { trackName, artistName }
+};
+
+function _normalizeLine(s){
+  return (s || '').trim().toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseLRC(raw){
+  const out = [];
+  for(const rawLine of (raw || '').split(/\r?\n/)){
+    // a single line may have multiple [mm:ss.xx] timestamps at the start
+    const tags = [...rawLine.matchAll(/\[(\d+):(\d+)(?:[.:](\d+))?\]/g)];
+    if(!tags.length) continue;
+    const text = rawLine.replace(/\[(\d+):(\d+)(?:[.:](\d+))?\]/g, '').trim();
+    if(!text || /^(ar|al|ti|by|offset|length):/i.test(text)) continue;
+    for(const t of tags){
+      const min = +t[1], sec = +t[2], rawFrac = t[3] || '0';
+      const frac = +('0.' + rawFrac);
+      out.push({ time: min*60 + sec + frac, text });
+    }
+  }
+  out.sort((a,b) => a.time - b.time);
+  return out;
+}
+
+function detectSections(lines){
+  // Count normalized line occurrences. Lines appearing ≥2 times are likely chorus.
+  const counts = new Map();
+  for(const l of lines){
+    const n = _normalizeLine(l.text);
+    if(!n || n.length < 4) continue;
+    counts.set(n, (counts.get(n) || 0) + 1);
+  }
+  for(const l of lines){
+    const n = _normalizeLine(l.text);
+    if(!n) { l.section = 'instrumental'; continue; }
+    if(n.length < 4) { l.section = 'verse'; continue; }
+    l.section = (counts.get(n) || 0) >= 2 ? 'chorus' : 'verse';
+  }
+  // Smoothing pass: single verse line trapped between chorus → make chorus
+  for(let i=1; i<lines.length-1; i++){
+    if(lines[i].section === 'verse' &&
+       lines[i-1].section === 'chorus' &&
+       lines[i+1].section === 'chorus'){
+      lines[i].section = 'chorus';
+    }
+  }
+  // Inverse smoothing: single chorus line trapped between verses → verse
+  for(let i=1; i<lines.length-1; i++){
+    if(lines[i].section === 'chorus' &&
+       lines[i-1].section === 'verse' &&
+       lines[i+1].section === 'verse'){
+      lines[i].section = 'verse';
+    }
+  }
+}
+
+async function fetchLyricsFromQuery(query){
+  try {
+    const r = await fetch('/api/lyrics', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ q: query }),
+    });
+    if(!r.ok) return null;
+    return await r.json();
+  } catch(_){ return null; }
+}
+
+function loadLyricsFromLRC(lrcText, meta){
+  const lines = parseLRC(lrcText);
+  if(!lines.length) return false;
+  detectSections(lines);
+  lyrics.lines = lines;
+  lyrics.currentIdx = -1;
+  lyrics.currentSection = null;
+  lyrics.linesSinceSwitch = 0;
+  lyrics.meta = meta || null;
+  lyrics.enabled = true;
+  return true;
+}
+
+function clearLyrics(){
+  lyrics.lines = [];
+  lyrics.enabled = false;
+  lyrics.currentIdx = -1;
+  lyrics.currentSection = null;
+}
+
+// Called from the main frame loop. Reads audio.currentTime from the reactor's
+// media element, finds the current line, fires section-transition + fallback
+// triggers, and pushes the current text into typography mode.
+function tickLyricsSync(){
+  if(!lyrics.enabled || !lyrics.lines.length) return;
+  const el = reactor.mediaEl;
+  if(!el || el.paused) return;
+  const t = el.currentTime;
+
+  // Find current line (last line whose time ≤ t)
+  let idx = -1;
+  for(let i=0; i<lyrics.lines.length; i++){
+    if(lyrics.lines[i].time <= t) idx = i; else break;
+  }
+
+  if(idx !== lyrics.currentIdx){
+    lyrics.currentIdx = idx;
+    if(idx >= 0){
+      const line = lyrics.lines[idx];
+      // Push to typography — show the current line as the display text
+      if(typeof typo !== 'undefined'){
+        typo.text = line.text;
+        typo.centerCurrent = line.text;
+        typo.centerSwapT = (state.t/1000) + 100;
+        // Auto-enable typography mode so the user sees the words
+        if(!state.modes.typography){
+          state.modes.typography = true;
+          const cb = document.querySelector('#modes input[data-mode="typography"]');
+          if(cb) cb.checked = true;
+        }
+      }
+      // Section transition → trigger random
+      if(line.section && line.section !== lyrics.currentSection){
+        const wasFirstLine = lyrics.currentSection === null;
+        lyrics.currentSection = line.section;
+        lyrics.linesSinceSwitch = 0;
+        // Don't trigger random on the very first line (user just hit play)
+        if(!wasFirstLine && typeof randomizeAll === 'function'){
+          randomizeAll();
+        }
+      } else {
+        // Same section — count toward fallback
+        lyrics.linesSinceSwitch++;
+        if(lyrics.linesSinceSwitch >= lyrics.linesPerSwitchFallback){
+          lyrics.linesSinceSwitch = 0;
+          if(typeof randomizeAll === 'function') randomizeAll();
+        }
+      }
+    }
+  }
+
+  // Instrumental gap detection — if gap to next line > threshold, fire random
+  // every instrumentalSwitchSec seconds while waiting.
+  const next = lyrics.lines[lyrics.currentIdx + 1];
+  if(next){
+    const gap = next.time - t;
+    if(gap > lyrics.instrumentalGapSec){
+      const now = performance.now() / 1000;
+      if(now - lyrics._lastGapSwitch > lyrics.instrumentalSwitchSec){
+        lyrics._lastGapSwitch = now;
+        if(typeof randomizeAll === 'function') randomizeAll();
+      }
+    }
+  }
+}
 
 // ---- UI wiring ----
 const audioStatusEl = document.getElementById('audioStatus');
@@ -7160,6 +7454,97 @@ if(silentOutputCb){
 if(state.silentOutput){
   document.title = '🔇 ' + document.title + ' · projection';
 }
+
+// ─── Lyrics sync UI wiring ───
+(function wireLyrics(){
+  const searchEl = document.getElementById('lyricsSearch');
+  const fetchBtn = document.getElementById('lyricsFetch');
+  const toggleBtn = document.getElementById('lyricsToggle');
+  const pasteBtn = document.getElementById('lyricsPaste');
+  const clearBtn = document.getElementById('lyricsClear');
+  const statusEl = document.getElementById('lyricsStatus');
+  if(!searchEl) return;
+
+  function setStatus(text){ if(statusEl) statusEl.textContent = text; }
+  function setToggleLabel(){
+    if(!toggleBtn) return;
+    toggleBtn.textContent = lyrics.enabled ? 'On · sync live' : 'Off';
+    toggleBtn.classList.toggle('on', lyrics.enabled);
+  }
+
+  fetchBtn && fetchBtn.addEventListener('click', async () => {
+    const q = searchEl.value.trim();
+    if(!q){ setStatus('enter a title — artist (e.g. "moon river — sinatra")'); return; }
+    fetchBtn.disabled = true;
+    const _orig = fetchBtn.textContent; fetchBtn.textContent = 'fetching…';
+    setStatus('searching lrclib…');
+    const res = await fetchLyricsFromQuery(q);
+    fetchBtn.disabled = false; fetchBtn.textContent = _orig;
+    if(!res || !res.found){
+      setStatus('not found — paste LRC manually or check the spelling');
+      return;
+    }
+    if(!res.synced){
+      setStatus(`found "${res.trackName}" by ${res.artistName} — plain text only (no timing). Paste a timed LRC for sync.`);
+      return;
+    }
+    const ok = loadLyricsFromLRC(res.synced, { trackName: res.trackName, artistName: res.artistName });
+    if(ok){
+      setStatus(`loaded · ${res.trackName} — ${res.artistName} · ${lyrics.lines.length} lines · ${lyrics.lines.filter(l=>l.section==='chorus').length} chorus`);
+      setToggleLabel();
+    } else {
+      setStatus('lyrics parsed empty — try another result');
+    }
+  });
+
+  toggleBtn && toggleBtn.addEventListener('click', () => {
+    if(!lyrics.lines.length){ setStatus('load lyrics first (Fetch or Paste)'); return; }
+    lyrics.enabled = !lyrics.enabled;
+    setToggleLabel();
+  });
+
+  pasteBtn && pasteBtn.addEventListener('click', () => {
+    const text = prompt('Paste LRC content (lines like [01:23.45]歌詞):');
+    if(!text) return;
+    const ok = loadLyricsFromLRC(text, null);
+    if(ok){
+      setStatus(`loaded · ${lyrics.lines.length} lines · ${lyrics.lines.filter(l=>l.section==='chorus').length} chorus`);
+      setToggleLabel();
+    } else {
+      setStatus('could not parse — make sure timestamps are in [mm:ss.xx] format');
+    }
+  });
+
+  clearBtn && clearBtn.addEventListener('click', () => {
+    clearLyrics();
+    setStatus('no lyrics loaded');
+    setToggleLabel();
+  });
+
+  // Sliders
+  function wireLyricsSlider(inputId, fillId, thumbId, valId, key, fmt, transform){
+    const inp = document.getElementById(inputId);
+    const fill = document.getElementById(fillId);
+    const thumb = document.getElementById(thumbId);
+    const val = document.getElementById(valId);
+    if(!inp) return;
+    const upd = () => {
+      const raw = +inp.value;
+      const v = transform ? transform(raw) : raw;
+      lyrics[key] = v;
+      const p = (raw - +inp.min)/(+inp.max - +inp.min) * 100;
+      if(fill) fill.style.width = p + '%';
+      if(thumb) thumb.style.left = p + '%';
+      if(val) val.textContent = fmt ? fmt(v, raw) : String(v);
+    };
+    inp.addEventListener('input', upd); upd();
+  }
+  wireLyricsSlider('lyricsEvery','lyricsEveryFill','lyricsEveryThumb','lyricsEveryVal', 'linesPerSwitchFallback', (v)=>String(v));
+  wireLyricsSlider('lyricsGap','lyricsGapFill','lyricsGapThumb','lyricsGapVal', 'instrumentalGapSec', (v)=>v+'s');
+  wireLyricsSlider('lyricsGapInt','lyricsGapIntFill','lyricsGapIntThumb','lyricsGapIntVal', 'instrumentalSwitchSec', (v)=>v+'s', (raw)=>raw/10);
+
+  setToggleLabel();
+})();
 
 // Light mode — paper canvas (drawBackground + bgClearColor paint cream natively now).
 // We DON'T use a CSS invert filter anymore — that was a full-screen GPU pass per frame
