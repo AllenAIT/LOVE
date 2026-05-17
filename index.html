@@ -172,10 +172,70 @@
   @keyframes gateIn{ from{opacity:0} to{opacity:1} }
   .gate-card{
     background:rgba(18,18,28,.72); border:1px solid rgba(255,255,255,.10);
-    border-radius:14px; padding:38px 36px; max-width:420px; width:88%;
+    border-radius:14px; padding:38px 36px; max-width:460px; width:88%;
     backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px);
     box-shadow:0 30px 80px rgba(0,0,0,.5);
   }
+  .gate-tagline{
+    font-family:'Instrument Serif', serif; font-size:14px;
+    color:var(--ink-soft); margin:-2px 0 18px; opacity:.85;
+  }
+  .gate-desc{
+    font-size:12.5px; line-height:1.6; color:var(--ink); opacity:.88;
+    margin-bottom:14px; font-family:var(--sans);
+  }
+  .gate-desc .cjk{ font-family:"Noto Sans TC", var(--sans); opacity:.75; }
+  .gate-features{
+    border:1px solid rgba(255,255,255,.06); border-radius:8px;
+    padding:10px 12px; margin-bottom:18px;
+    font-size:10.5px; line-height:1.75; color:var(--ink-soft);
+    font-family:var(--sans); letter-spacing:.02em;
+    background:rgba(255,255,255,.015);
+  }
+  .gate-buttons{
+    display:grid; grid-template-columns:1fr 1fr; gap:8px;
+    margin-bottom:14px;
+  }
+  .gate-secondary{
+    border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.04);
+    color:var(--ink); border-radius:8px; padding:14px 8px; cursor:pointer;
+    font-family:var(--sans); display:flex; flex-direction:column; align-items:center; gap:3px;
+    transition: background .15s, border-color .15s, transform .1s;
+  }
+  .gate-secondary:hover{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.30); }
+  .gate-secondary:active{ transform:scale(.98); }
+  .gate-secondary .big, .gate-submit .big{
+    font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; font-weight:600;
+  }
+  .gate-secondary .hint, .gate-submit .hint{
+    font-size:9.5px; letter-spacing:.10em; opacity:.6; text-transform:none;
+  }
+  .gate-submit{
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    padding:14px 8px;
+  }
+  .gate-submit .hint{ color:#0e0c16; opacity:.55; }
+  .gate-back{
+    text-align:center; font-size:11px; color:var(--ink-soft); opacity:.7;
+    cursor:pointer; margin-top:14px; padding:6px;
+    transition: color .15s;
+  }
+  .gate-back:hover{ color:#c87cff; opacity:1; }
+
+  /* Preview-mode CTA — small chip pinned top-center when user is browsing as guest */
+  .preview-cta{
+    position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:6;
+    background:rgba(8,8,14,.88); backdrop-filter:blur(12px);
+    border:1px solid rgba(200,124,255,.35); border-radius:999px;
+    padding:7px 16px; cursor:pointer;
+    font-family:var(--sans); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:#fff; display:flex; align-items:center; gap:8px;
+    transition: background .15s, border-color .15s, transform .12s;
+  }
+  .preview-cta:hover{ background:rgba(200,124,255,.18); border-color:#c87cff; }
+  .preview-cta:active{ transform:translateX(-50%) scale(.97); }
+  .preview-cta .glyph{ opacity:.7; }
+  .preview-cta.hidden{ display:none; }
   .gate-title{
     font-family:'Instrument Serif', serif; font-size:32px; font-style:italic;
     color:var(--ink); margin:0 0 4px; letter-spacing:-.01em; line-height:1.1;
@@ -690,13 +750,48 @@
 </style>
 </head>
 <body>
-  <!-- Registration gate — blocks everything until user submits name + email + profession.
-       Skipped automatically for projection windows (?silent=1) since the human already
-       registered on the operator window of the same browser (shared localStorage). -->
+  <!-- Registration gate — two-stage:
+       1. Welcome view: app description + Try preview / Register CTAs
+       2. Register view: name/email/profession form (acts as login too — email match
+          re-applies license automatically). Returning users skip both.
+       Projection windows (?silent=1) auto-bypass. -->
   <div class="gate-overlay" id="gateOverlay">
-    <div class="gate-card">
+
+    <!-- Stage 1: Welcome -->
+    <div class="gate-card" id="gateWelcome">
       <div class="gate-title">Inner Weather</div>
-      <div class="gate-subtitle">register to enter · 註冊以進入</div>
+      <div class="gate-tagline"><em>a field of feeling · 心境視覺場域</em></div>
+      <div class="gate-desc">
+        Inner Weather is an audio-reactive generative visual instrument that translates
+        feelings, sound and words into a living field.<br>
+        <span class="cjk">一個會呼吸的視覺場域 — 把音樂、感覺、文字翻譯成流動的畫面。</span>
+      </div>
+      <div class="gate-features">
+        <div>20+ visual modes — 水墨 / Pop Art / Matrix / EVA / Polygon / 8-bit / Glitch…</div>
+        <div>Audio-reactive with auto-gain · works with any track or live mic</div>
+        <div>Camera face / hand FX · typography · AI line-art glyphs</div>
+        <div>MIDI controller input · VJ hotkeys · LFO · A/B crossfade</div>
+      </div>
+      <div class="gate-buttons">
+        <button class="gate-secondary" id="gateTryBtn" type="button">
+          <span class="big">Try preview</span>
+          <span class="hint">試用 · Random only</span>
+        </button>
+        <button class="gate-submit" id="gateRegisterBtn" type="button">
+          <span class="big">Register / Sign in</span>
+          <span class="hint">註冊 / 登入 · 完整功能</span>
+        </button>
+      </div>
+      <div class="gate-foot">
+        Saved images &amp; recorded videos carry a "© Allen Hong" watermark.<br>
+        For watermark-free use, contact <a href="mailto:ai.allen.task@gmail.com">ai.allen.task@gmail.com</a>
+      </div>
+    </div>
+
+    <!-- Stage 2: Register / Sign-in (hidden initially) -->
+    <div class="gate-card" id="gateRegister" style="display:none">
+      <div class="gate-title">Inner Weather</div>
+      <div class="gate-subtitle">enter your details · 註冊或登入</div>
       <form id="gateForm" autocomplete="off">
         <div class="gate-field">
           <label for="gateName">Name · 姓名</label>
@@ -712,17 +807,23 @@
         </div>
         <button class="gate-submit" type="submit">Enter the field</button>
       </form>
+      <div class="gate-back" id="gateBackBtn">← back to welcome</div>
       <div class="gate-foot">
-        your info stays on this device — nothing leaves your browser.<br>
-        <span style="opacity:.85">saved images &amp; recorded videos carry a "© Allen Hong" watermark.<br>
-        for a watermark-free license, contact <a href="mailto:ai.allen.task@gmail.com" style="color:#c87cff;text-decoration:none">ai.allen.task@gmail.com</a></span>
+        Already registered? Use the same email — your license is recovered automatically.<br>
+        <span style="opacity:.7">Your info stays on this device. Nothing else leaves your browser.</span>
       </div>
     </div>
+
   </div>
 
   <div id="stage">
     <canvas id="cv"></canvas>
   </div>
+
+  <!-- Preview-mode upgrade chip — shown when guest is in preview, click → register modal -->
+  <button class="preview-cta hidden" id="previewCta" type="button">
+    <span class="glyph">●</span><span>preview mode · register for full access</span>
+  </button>
 
   <!-- Author footer — © Allen Hong + IG link -->
   <div class="author-foot">
@@ -6217,38 +6318,81 @@ function applyLicense(lic){
   }
 }
 
+// state.previewMode = true when user clicked "Try preview" without registering.
+// In preview mode the global click-interceptor blocks anything other than Random,
+// Reset, and the lock chips → those clicks open the register modal instead.
+state.previewMode = false;
+
+function getRegisteredUser(){
+  try {
+    const u = JSON.parse(localStorage.getItem(GATE_KEY) || 'null');
+    if(u && u.name && u.email && u.role) return u;
+  } catch(_){}
+  return null;
+}
+
 (function setupGate(){
-  const overlay = document.getElementById('gateOverlay');
-  const form = document.getElementById('gateForm');
+  const overlay   = document.getElementById('gateOverlay');
+  const welcome   = document.getElementById('gateWelcome');
+  const register  = document.getElementById('gateRegister');
+  const form      = document.getElementById('gateForm');
+  const tryBtn    = document.getElementById('gateTryBtn');
+  const regBtn    = document.getElementById('gateRegisterBtn');
+  const backBtn   = document.getElementById('gateBackBtn');
+  const previewCta = document.getElementById('previewCta');
   if(!overlay || !form) return;
 
-  function getRegisteredUser(){
-    try {
-      const u = JSON.parse(localStorage.getItem(GATE_KEY) || 'null');
-      if(u && u.name && u.email && u.role) return u;
-    } catch(_){}
-    return null;
+  function showWelcome(){
+    welcome.style.display  = '';
+    register.style.display = 'none';
+    overlay.classList.remove('hidden');
   }
+  function showRegister(){
+    welcome.style.display  = 'none';
+    register.style.display = '';
+    overlay.classList.remove('hidden');
+    setTimeout(() => document.getElementById('gateName').focus(), 80);
+    // Pre-fill if we have any partial user data already
+    const existing = getRegisteredUser();
+    if(existing){
+      document.getElementById('gateName').value  = existing.name  || '';
+      document.getElementById('gateEmail').value = existing.email || '';
+      document.getElementById('gateRole').value  = existing.role  || '';
+    }
+  }
+  function hideGate(){ overlay.classList.add('hidden'); }
 
-  // Bypass for projection windows
+  // Initial decision
   const isProjection = new URLSearchParams(location.search).has('silent');
   const existing = getRegisteredUser();
-  if(isProjection || existing){
-    overlay.classList.add('hidden');
-    // Cached license check — apply stored license immediately, then refresh from server.
-    if(existing){
-      try {
-        const cached = JSON.parse(localStorage.getItem(LICENSE_KEY) || 'null');
-        if(cached && cached.expires && cached.expires > Date.now()) applyLicense(cached);
-      } catch(_){}
-      // Re-check in background — admin might have updated the whitelist.
-      checkLicense(existing.email).then(lic => { if(lic) applyLicense(lic); });
-    }
+  if(isProjection){
+    hideGate();
+  } else if(existing){
+    // returning user → straight in, then refresh license in background
+    hideGate();
+    try {
+      const cached = JSON.parse(localStorage.getItem(LICENSE_KEY) || 'null');
+      if(cached && cached.expires && cached.expires > Date.now()) applyLicense(cached);
+    } catch(_){}
+    checkLicense(existing.email).then(lic => { if(lic) applyLicense(lic); });
   } else {
-    setTimeout(() => document.getElementById('gateName').focus(), 200);
+    showWelcome();
   }
 
-  form.addEventListener('submit', async (e) => {
+  // Stage-1 buttons
+  if(tryBtn) tryBtn.addEventListener('click', () => {
+    state.previewMode = true;
+    hideGate();
+    if(previewCta) previewCta.classList.remove('hidden');
+  });
+  if(regBtn) regBtn.addEventListener('click', () => { showRegister(); });
+  if(backBtn) backBtn.addEventListener('click', () => { showWelcome(); });
+
+  // Preview-mode CTA → open register modal
+  if(previewCta) previewCta.addEventListener('click', () => { showRegister(); });
+
+  // Form submit — synchronous hide so UI feels instant, license check runs in background.
+  form.addEventListener('submit', (e) => {
     e.preventDefault();
     const name  = document.getElementById('gateName').value.trim();
     const email = document.getElementById('gateEmail').value.trim();
@@ -6260,11 +6404,81 @@ function applyLicense(lic){
         name, email, role, registeredAt: Date.now(),
       }));
     } catch(_){}
-    // Hit the license API; outcome decides watermark.
-    const lic = await checkLicense(email);
-    if(lic) applyLicense(lic);
-    overlay.classList.add('hidden');
+    state.previewMode = false;
+    if(previewCta) previewCta.classList.add('hidden');
+    hideGate();
+    // Background license check — sets noWatermark if email is whitelisted
+    checkLicense(email).then(lic => { if(lic) applyLicense(lic); });
   });
+
+  // Expose for the interceptor below
+  window._openRegisterGate = showRegister;
+})();
+
+// Preview-mode click interceptor — gates everything except Random / Reset / lock chips.
+// Capture-phase listener so we intercept before downstream handlers run.
+(function setupPreviewInterceptor(){
+  // Allowlist: things the preview user CAN click without being kicked to register.
+  // Identified by element id, class, or closest ancestor matching these.
+  const ALLOW_IDS = new Set([
+    'qaRandomTop', 'qaResetTop', 'randTop', 'randomize', 'reset',
+    'gateOverlay', 'gateWelcome', 'gateRegister', 'gateForm',
+    'gateTryBtn', 'gateRegisterBtn', 'gateBackBtn', 'gateName', 'gateEmail', 'gateRole',
+    'previewCta',
+    'fab', 'closePanel',           // panel open/close OK
+    'hotkeyToggleBtn',
+  ]);
+  const ALLOW_SELECTORS = [
+    '.lock-chip',
+    '.author-foot',
+    '#hotkeyHelp',
+    '.gate-overlay',
+  ];
+
+  function isAllowed(el){
+    if(!el || el.nodeType !== 1) return true;  // text node etc.
+    let cur = el;
+    while(cur && cur !== document.body){
+      if(cur.id && ALLOW_IDS.has(cur.id)) return true;
+      for(const sel of ALLOW_SELECTORS){
+        if(cur.matches && cur.matches(sel)) return true;
+      }
+      cur = cur.parentElement;
+    }
+    return false;
+  }
+
+  function gateBlock(e){
+    if(!state.previewMode) return;
+    if(isAllowed(e.target)) return;
+    // Only intercept interactive events
+    const t = e.target;
+    const tag = (t.tagName || '').toLowerCase();
+    const isInteractive = ['button','input','select','textarea','a','label'].includes(tag)
+      || (t.closest && t.closest('button, input, select, textarea, a, label, .mode-chip, .preset, .phrase-chip, [data-preset], [data-mode]'));
+    if(!isInteractive) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if(typeof window._openRegisterGate === 'function') window._openRegisterGate();
+  }
+  // capture phase so we run BEFORE the element's own listener
+  document.addEventListener('click', gateBlock, true);
+  document.addEventListener('input', gateBlock, true);
+  document.addEventListener('change', gateBlock, true);
+  document.addEventListener('keydown', (e) => {
+    // Allow only specific keys in preview: R (random), X (reset), space (blackout), ?, P
+    if(!state.previewMode) return;
+    const tgt = e.target;
+    if(tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)){
+      // typing in the gate form itself — allow
+      return;
+    }
+    const k = (e.key || '').toLowerCase();
+    const allowKeys = ['r','x',' ','?','/','p','escape','f'];
+    if(allowKeys.includes(k)) return;
+    e.preventDefault(); e.stopPropagation();
+    if(typeof window._openRegisterGate === 'function') window._openRegisterGate();
+  }, true);
 })();
 
 // Silent audio output — wire toggle + sync from URL param
