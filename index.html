@@ -1231,7 +1231,7 @@ return {
         </div>
 
         <div class="section">
-          <h3 class="section-title">Built-in presets</h3>
+          <h3 class="section-title">Built-in presets <em style="font-size:11px;color:var(--ink-faint);font-style:normal;letter-spacing:.12em;text-transform:uppercase;margin-left:6px">mood</em></h3>
           <div class="actions" style="border:none;padding:0;grid-template-columns:1fr 1fr">
             <button class="btn" data-preset="aurora">Aurora</button>
             <button class="btn" data-preset="ember">Ember</button>
@@ -1239,6 +1239,18 @@ return {
             <button class="btn" data-preset="bloom">Bloom</button>
             <button class="btn" data-preset="acid">Acid</button>
             <button class="btn" data-preset="ghost">Ghost</button>
+          </div>
+        </div>
+        <div class="section">
+          <h3 class="section-title">Style presets <em style="font-size:11px;color:var(--ink-faint);font-style:normal;letter-spacing:.12em;text-transform:uppercase;margin-left:6px">VJ looks</em></h3>
+          <div class="actions" style="border:none;padding:0;grid-template-columns:1fr 1fr">
+            <button class="btn" data-preset="inkWash">水墨 Ink wash</button>
+            <button class="btn" data-preset="popArt">普普 Pop art</button>
+            <button class="btn" data-preset="matrix">Matrix 數位雨</button>
+            <button class="btn" data-preset="eva">EVA HUD</button>
+            <button class="btn" data-preset="glitch">Glitch 故障</button>
+            <button class="btn" data-preset="polygon">Polygon 多邊</button>
+            <button class="btn" data-preset="pixel">8-Bit pixel</button>
           </div>
         </div>
       </section>
@@ -2887,29 +2899,99 @@ const PRESETS = {
   bloom:   { values:{love:65, joy:55, hope:45, curiosity:35}, temp:50, vibrance:85, hueShift:10, kaleido:8, modes:{base:true} },
   acid:    { values:{jealousy:80, anger:40, desire:35, joy:25}, temp:65, vibrance:95, hueShift:-30, kaleido:12, modes:{base:true, spiral:true} },
   ghost:   { values:{fear:60, grief:40, calm:25, awe:20}, temp:30, vibrance:25, hueShift:140, kaleido:0, modes:{base:true, lineTrace:true} },
+  // —— New style-driven presets — bundle background + atmosphere + reactivity ——
+  inkWash: { values:{calm:55, awe:35, peaceful:30, melancholy:18}, temp:25, vibrance:18, hueShift:0, kaleido:0,
+             modes:{base:false, inkWash:true},
+             lightMode:true, bgDark:0.05, bloom:0.10, trails:0.55, grain:0.55, vignette:0.40,
+             density:0.45, motionSpeed:0.35, turbulence:0.20, glow:0.4, mirror:0 },
+  popArt:  { values:{joy:75, excited:60, playful:45, desire:30}, temp:68, vibrance:92, hueShift:18, kaleido:0,
+             modes:{base:true, popArt:true},
+             lightMode:false, bgDark:0.30, bloom:0.55, trails:0.10, grain:0.35, vignette:0.30,
+             density:1.10, motionSpeed:1.20, turbulence:0.35, glow:1.10, mirror:0 },
+  matrix:  { values:{focused:65, mystic:45, electric:35, void:25}, temp:42, vibrance:48, hueShift:90, kaleido:0,
+             modes:{base:true, matrix:true},
+             lightMode:false, bgDark:0.78, bloom:0.55, trails:0.62, grain:0.20, vignette:0.55,
+             density:0.85, motionSpeed:0.95, turbulence:0.20, glow:1.20, mirror:0 },
+  eva:     { values:{rage:60, focused:55, electric:40, fear:25}, temp:72, vibrance:82, hueShift:-8, kaleido:0,
+             modes:{base:true, eva:true},
+             lightMode:false, bgDark:0.65, bloom:0.65, trails:0.20, grain:0.25, vignette:0.60,
+             density:0.95, motionSpeed:1.10, turbulence:0.45, glow:1.20, mirror:0 },
+  glitch:  { values:{chaos:70, fear:35, electric:50, void:20}, temp:55, vibrance:78, hueShift:-30, kaleido:0,
+             modes:{base:true, glitch:true},
+             lightMode:false, bgDark:0.55, bloom:0.45, trails:0.30, grain:0.65, vignette:0.50,
+             density:1.15, motionSpeed:1.30, turbulence:0.85, glow:1.0, mirror:0 },
+  polygon: { values:{focused:55, mystic:35, awe:30, electric:30}, temp:48, vibrance:65, hueShift:170, kaleido:0,
+             modes:{base:true, polygon:true},
+             lightMode:false, bgDark:0.70, bloom:0.70, trails:0.18, grain:0.30, vignette:0.55,
+             density:0.85, motionSpeed:1.10, turbulence:0.30, glow:1.15, mirror:0 },
+  pixel:   { values:{joy:55, playful:50, curiosity:35, nostalgia:25}, temp:55, vibrance:88, hueShift:25, kaleido:0,
+             modes:{base:true, flowField:true, pixel8:true},
+             lightMode:false, bgDark:0.35, bloom:0.45, trails:0.08, grain:0.20, vignette:0.30,
+             density:1.20, motionSpeed:1.20, turbulence:0.40, glow:1.0, mirror:0 },
 };
 document.querySelectorAll('[data-preset]').forEach(b=>{
   b.addEventListener('click', ()=>{
     const p = PRESETS[b.dataset.preset];
+    if(!p) return;
     for(const e of EMOTIONS) state.values[e.id] = 0;
     Object.assign(state.values, p.values);
     state.temp = p.temp; state.vibrance = p.vibrance;
     state.hueShift = p.hueShift; state.kaleido = p.kaleido;
+    // Atmosphere / motion fields — only set if preset defines them
+    const atmosphereKeys = ['bgDark','bloom','trails','grain','vignette','density','motionSpeed','turbulence','glow','mirror'];
+    for(const k of atmosphereKeys){
+      if(p[k] != null) state[k] = p[k];
+    }
     // sync UI
     for(const e of EMOTIONS) updateRow(e.id);
     updateTemp();
-    document.getElementById('vib').value = state.vibrance; document.getElementById('vib').dispatchEvent(new Event('input'));
-    document.getElementById('hue').value = state.hueShift; document.getElementById('hue').dispatchEvent(new Event('input'));
+    // Push atmosphere fields into matching sliders so the UI reflects them
+    const sliderMap = {
+      vibrance:['vib',1], hueShift:['hue',1], bgDark:['dark',100], bloom:['bloom',100],
+      trails:['trail',100], grain:['grain',100], vignette:['vig',100],
+      density:['dens',100], motionSpeed:['mot',100], turbulence:['turb',100], glow:['glow',100],
+    };
+    for(const k in sliderMap){
+      const [id, mul] = sliderMap[k];
+      const el = document.getElementById(id);
+      if(el && state[k] != null){
+        el.value = Math.round(state[k] * mul);
+        el.dispatchEvent(new Event('input'));
+      }
+    }
     // kaleido segs
     document.querySelectorAll('#kaleidoSeg button').forEach(x=>{
       x.classList.toggle('on', +x.dataset.k === state.kaleido);
     });
-    document.getElementById('kaleidoVal').textContent = state.kaleido === 0 ? 'off' : state.kaleido + ' segments';
-    // modes
+    const kVal = document.getElementById('kaleidoVal');
+    if(kVal) kVal.textContent = state.kaleido === 0 ? 'off' : state.kaleido + ' segments';
+    // Mirror segmented control
+    if(p.mirror != null){
+      document.querySelectorAll('#mirrorSeg button').forEach(x=>{
+        x.classList.toggle('on', +x.dataset.m === state.mirror);
+      });
+      const mVal = document.getElementById('mirrorVal');
+      if(mVal){ const names=['none','horizontal','vertical','quad']; mVal.textContent = names[state.mirror]||'none'; }
+    }
+    // modes (preserve webcamFX + typography — same rule as RANDOM)
+    const keepW = state.modes.webcamFX, keepT = state.modes.typography;
     document.querySelectorAll('#modes input').forEach(cb=>{
-      cb.checked = !!p.modes[cb.dataset.mode];
-      state.modes[cb.dataset.mode] = cb.checked;
+      const k = cb.dataset.mode;
+      cb.checked = !!p.modes[k];
+      state.modes[k] = cb.checked;
     });
+    state.modes.webcamFX = keepW; state.modes.typography = keepT;
+    document.querySelectorAll('#modes input').forEach(cb=>{
+      if(cb.dataset.mode==='webcamFX') cb.checked = keepW;
+      if(cb.dataset.mode==='typography') cb.checked = keepT;
+    });
+    // Light mode toggle
+    if(p.lightMode != null){
+      state.lightMode = !!p.lightMode;
+      const lm = document.getElementById('lightModeToggle');
+      if(lm){ lm.checked = state.lightMode; }
+      if(typeof applyLightMode === 'function') applyLightMode();
+    }
     updateReadout();
   });
 });
@@ -3376,69 +3458,187 @@ function drawAurora(g, dt, T){
 }
 
 // ============================================================
-// Ink wash · 水墨 — brush strokes with bleeding edges
+// Ink wash · 水墨 — proper sumi-e style: tapered brush, wet bleeds that
+// expand slowly over time, dry-brush feathering (飛白), growing ink pools.
+// Each stroke is pre-sampled into ~24 control points so we can do:
+//   - 3-pass render: wide soft bleed → mid wet body → sharp tip
+//   - per-segment alpha so dry-brush gaps show through
+//   - independent slow-growing pools at random points along the stroke
 // ============================================================
 let _inkStrokes = [];
 let _inkSpawnT = 0;
+function _seedInkStroke(){
+  const fromLeft = Math.random() < 0.5;
+  const horizontal = Math.random() < 0.5;
+  const startSide = Math.random();
+  let x0, y0, x1, y1;
+  if(horizontal){
+    const cy = Math.random()*H;
+    x0 = fromLeft ? -80*SCALE : W+80*SCALE;
+    x1 = fromLeft ? W+80*SCALE : -80*SCALE;
+    y0 = cy + (Math.random()-0.5)*H*0.2;
+    y1 = cy + (Math.random()-0.5)*H*0.2;
+  } else {
+    const cx = Math.random()*W;
+    x0 = cx + (Math.random()-0.5)*W*0.2;
+    x1 = cx + (Math.random()-0.5)*W*0.2;
+    y0 = startSide < 0.5 ? -80*SCALE : H+80*SCALE;
+    y1 = startSide < 0.5 ? H+80*SCALE : -80*SCALE;
+  }
+  // Sample N points along a quadratic curve, with per-segment dryness (飛白)
+  const N = 22;
+  const bend = (Math.random()-0.5) * Math.min(W,H) * 0.45;
+  const mx = (x0+x1)/2 + (horizontal ? 0 : bend);
+  const my = (y0+y1)/2 + (horizontal ? bend : 0);
+  const pts = [];
+  // Pre-roll a dryness pattern so the brush "runs out" along the path
+  const dryStart = 0.55 + Math.random()*0.3;  // dryness begins this far in
+  for(let i=0;i<=N;i++){
+    const u = i/N;
+    // quadratic bezier
+    const px = (1-u)*(1-u)*x0 + 2*(1-u)*u*mx + u*u*x1;
+    const py = (1-u)*(1-u)*y0 + 2*(1-u)*u*my + u*u*y1;
+    // taper: thick in mid, thin at both ends (calligraphic)
+    const taper = Math.sin(u*Math.PI);  // 0 → 1 → 0
+    // dryness: 1 = full wet, lower = scratchy gaps
+    let dry = 1;
+    if(u > dryStart){
+      const dr = (u - dryStart) / (1 - dryStart);
+      dry = Math.max(0.15, 1 - dr*0.7);
+      // periodic gaps (飛白) — fully transparent slivers
+      if(Math.sin(u*40 + dryStart*7) < -0.35) dry *= 0.25;
+    }
+    pts.push({ x: px, y: py, taper, dry });
+  }
+  // A few pools positioned along the stroke that grow slowly outwards
+  const pools = [];
+  const poolN = 1 + Math.floor(Math.random()*3);
+  for(let i=0;i<poolN;i++){
+    const u = 0.15 + Math.random()*0.7;
+    const idx = Math.floor(u*N);
+    pools.push({
+      x: pts[idx].x + (Math.random()-0.5)*60*SCALE,
+      y: pts[idx].y + (Math.random()-0.5)*60*SCALE,
+      r0: (12 + Math.random()*30) * SCALE,
+      rGrowth: (30 + Math.random()*55) * SCALE,
+      bornAt: 0,
+    });
+  }
+  return {
+    pts,
+    bodyWidth: (28 + Math.random()*80) * SCALE,
+    life: 0,
+    drawSpeed: 0.6 + Math.random()*0.9,    // how fast the brush sweeps (multiplier on raw time)
+    fadeStart: 2.5 + Math.random()*3.5,    // when the stroke begins to fade back
+    fadeDuration: 4 + Math.random()*4,      // how long fade takes
+    pools,
+    isBeatSplash: (reactor.bass||0) > 0.45 && Math.random() < 0.4,
+  };
+}
+
 function drawInkWash(g, dt, T){
   const dts = dt/1000;
-  const interval = Math.max(0.18, 0.9 - state.motionSpeed*0.45 - (reactor.mid||0)*0.4);
+  const interval = Math.max(0.32, 1.4 - state.motionSpeed*0.5 - (reactor.mid||0)*0.5);
   _inkSpawnT += dts;
-  let safety = 4;
+  let safety = 3;
   while(_inkSpawnT > interval && safety-- > 0){
     _inkSpawnT -= interval;
-    const fromLeft = Math.random() < 0.5;
-    const cy = Math.random() * H;
-    const stroke = {
-      x0: fromLeft ? -60*SCALE : W+60*SCALE,
-      y0: cy + (Math.random()-0.5)*H*0.3,
-      x1: fromLeft ? W+60*SCALE : -60*SCALE,
-      y1: cy + (Math.random()-0.5)*H*0.3,
-      width: (22 + Math.random()*70) * SCALE,
-      life: 0,
-      maxLife: 1.6 + Math.random()*2.4,
-      bend: (Math.random()-0.5) * H * 0.4,
-      drips: [],
-      splash: (reactor.bass||0) > 0.35 && Math.random() < 0.45,
-      dropsSpawned: false,
-    };
-    _inkStrokes.push(stroke);
+    _inkStrokes.push(_seedInkStroke());
   }
-  if(_inkStrokes.length > 60) _inkStrokes.splice(0, _inkStrokes.length - 60);
+  if(_inkStrokes.length > 24) _inkStrokes.splice(0, _inkStrokes.length - 24);
   g.save();
   g.lineCap = 'round';
+  g.lineJoin = 'round';
   for(let i=_inkStrokes.length-1; i>=0; i--){
     const s = _inkStrokes[i];
     s.life += dts;
-    if(s.life > s.maxLife){ _inkStrokes.splice(i,1); continue; }
-    const prog = s.life / s.maxLife;
-    const draw = Math.min(1, prog * 1.4);
-    const ex = lerp(s.x0, s.x1, draw);
-    const ey = lerp(s.y0, s.y1, draw);
-    const mcx = (s.x0+s.x1)/2;
-    const mcy = (s.y0+s.y1)/2 + s.bend;
-    const alpha = clamp((1 - Math.pow(prog,1.6))*0.6, 0, 0.7);
-    g.strokeStyle = `rgba(12,14,22,${alpha})`;
-    g.lineWidth = s.width * (1 - prog*0.25) * (0.55 + Math.sin(prog*Math.PI)*0.55);
-    g.shadowColor = 'rgba(12,14,22,0.5)';
-    g.shadowBlur = 16 * SCALE;
+    const totalLife = s.fadeStart + s.fadeDuration;
+    if(s.life > totalLife){ _inkStrokes.splice(i,1); continue; }
+    // sweep progress (0 → 1 over fadeStart seconds, then stays 1)
+    const sweep = Math.min(1, s.life * s.drawSpeed * 0.6);
+    // overall fade after fadeStart
+    const fade = s.life < s.fadeStart ? 1
+               : 1 - Math.min(1, (s.life - s.fadeStart) / s.fadeDuration);
+    if(fade <= 0) continue;
+    const drawCount = Math.max(2, Math.floor(s.pts.length * sweep));
+
+    // —————— Pass 1: WET BLEED — wide, very translucent, heavy shadow blur ——————
+    g.strokeStyle = `rgba(20,22,32,${0.10 * fade})`;
+    g.lineWidth = s.bodyWidth * 2.2;
+    g.shadowColor = 'rgba(18,20,30,0.45)';
+    g.shadowBlur = 22 * SCALE;
     g.beginPath();
-    g.moveTo(s.x0, s.y0);
-    g.quadraticCurveTo(mcx, mcy, ex, ey);
+    for(let k=0;k<drawCount;k++){
+      const p = s.pts[k];
+      if(k===0) g.moveTo(p.x, p.y); else g.lineTo(p.x, p.y);
+    }
     g.stroke();
-    if(s.splash && !s.dropsSpawned){
-      s.dropsSpawned = true;
-      const mx = (s.x0+ex)/2 + (Math.random()-0.5)*120*SCALE;
-      const my = (s.y0+ey)/2 + (Math.random()-0.5)*120*SCALE;
-      for(let k=0;k<10;k++){
-        s.drips.push({x: mx + (Math.random()-0.5)*160*SCALE, y: my + (Math.random()-0.5)*160*SCALE, r: (2 + Math.random()*16)*SCALE});
+
+    // —————— Pass 2: WET BODY — main ink, alpha modulated by taper+dry ——————
+    g.shadowBlur = 10 * SCALE;
+    // Draw as segmented short paths so per-segment dryness shows through (飛白)
+    for(let k=1;k<drawCount;k++){
+      const p0 = s.pts[k-1], p1 = s.pts[k];
+      const wetness = p1.dry * (0.4 + p1.taper*0.6);
+      g.strokeStyle = `rgba(12,14,22,${0.55 * wetness * fade})`;
+      g.lineWidth = s.bodyWidth * (0.55 + p1.taper*0.55);
+      g.beginPath();
+      g.moveTo(p0.x, p0.y);
+      g.lineTo(p1.x, p1.y);
+      g.stroke();
+    }
+
+    // —————— Pass 3: SHARP CORE — narrow dark line for definition ——————
+    g.shadowBlur = 0;
+    for(let k=1;k<drawCount;k++){
+      const p0 = s.pts[k-1], p1 = s.pts[k];
+      const wetness = p1.dry;
+      if(wetness < 0.4) continue;   // dry segments skip the core
+      g.strokeStyle = `rgba(6,8,14,${0.75 * wetness * fade})`;
+      g.lineWidth = s.bodyWidth * 0.18 * (0.4 + p1.taper*0.6);
+      g.beginPath();
+      g.moveTo(p0.x, p0.y);
+      g.lineTo(p1.x, p1.y);
+      g.stroke();
+    }
+
+    // —————— Slow-growing ink pools at preset points along the stroke ——————
+    g.shadowBlur = 14 * SCALE;
+    g.shadowColor = 'rgba(18,20,30,0.4)';
+    for(const pool of s.pools){
+      // start growing only when the sweep reaches that part of the stroke
+      const poolSweep = Math.min(1, Math.max(0, s.life * 0.55 - 0.3));
+      if(poolSweep <= 0) continue;
+      const r = pool.r0 + poolSweep * pool.rGrowth;
+      // ink center
+      g.fillStyle = `rgba(10,12,20,${0.55 * fade})`;
+      g.beginPath(); g.arc(pool.x, pool.y, r*0.55, 0, TAU); g.fill();
+      // outer bleed (lower alpha, larger radius — the "wet halo")
+      g.fillStyle = `rgba(20,22,32,${0.18 * fade})`;
+      g.beginPath(); g.arc(pool.x, pool.y, r, 0, TAU); g.fill();
+    }
+
+    // —————— Beat splash droplets (only on bass-triggered strokes) ——————
+    if(s.isBeatSplash && !s.splashSpawned){
+      s.splashSpawned = true;
+      s.splashes = [];
+      const center = s.pts[Math.floor(s.pts.length*0.65)];
+      const splatN = 6 + Math.floor(Math.random()*8);
+      for(let k=0;k<splatN;k++){
+        const ang = Math.random()*TAU;
+        const dist = (30 + Math.random()*180)*SCALE;
+        s.splashes.push({
+          x: center.x + Math.cos(ang)*dist,
+          y: center.y + Math.sin(ang)*dist,
+          r: (3 + Math.random()*14)*SCALE,
+        });
       }
     }
-    if(s.drips.length){
-      g.shadowBlur = 8 * SCALE;
-      for(const d of s.drips){
-        g.fillStyle = `rgba(12,14,22,${alpha*0.85})`;
-        g.beginPath(); g.arc(d.x, d.y, d.r * (1 - prog*0.5), 0, TAU); g.fill();
+    if(s.splashes){
+      g.shadowBlur = 6 * SCALE;
+      for(const sp of s.splashes){
+        g.fillStyle = `rgba(8,10,18,${0.7 * fade})`;
+        g.beginPath(); g.arc(sp.x, sp.y, sp.r, 0, TAU); g.fill();
       }
     }
   }
@@ -3448,30 +3648,44 @@ function drawInkWash(g, dt, T){
 
 // ============================================================
 // 8-Bit · pixelation post-effect with palette quantization
+// Throttled — the GPU→CPU readback (getImageData) is the most expensive
+// Canvas op there is. Recompute every ~3 frames (or more under perf pressure),
+// cache the quantized buffer, just composite it the rest of the time.
 // ============================================================
 let _px8Cv = null, _px8Ctx = null;
+let _px8FrameCounter = 0;
+let _px8Ready = false;
 function drawPixel8(g, dt, T){
   if(!_px8Cv){
     _px8Cv = document.createElement('canvas');
     _px8Ctx = _px8Cv.getContext('2d', { willReadFrequently: true, alpha:false });
   }
-  // Resolution: ~80 px wide. Higher bass = chunkier on beat.
-  const baseW = 90 - Math.floor((reactor.bass||0)*30);
-  const cw = baseW;
-  const ch = Math.max(1, Math.round(baseW * H/W));
-  if(_px8Cv.width !== cw || _px8Cv.height !== ch){
-    _px8Cv.width = cw; _px8Cv.height = ch;
+  // Recompute interval scales with perf — bad fps = recompute less often.
+  const q = (window._perf && _perf.quality) || 1;
+  const interval = q < 0.5 ? 6 : q < 0.75 ? 4 : 3;
+  _px8FrameCounter++;
+  const shouldRecompute = !_px8Ready || (_px8FrameCounter % interval === 0);
+  if(shouldRecompute){
+    // Resolution scales with perf too. Bass jitters it on beat.
+    const targetW = q < 0.5 ? 64 : q < 0.75 ? 78 : 90;
+    const baseW = Math.max(40, targetW - Math.floor((reactor.bass||0)*22));
+    const cw = baseW;
+    const ch = Math.max(1, Math.round(baseW * H/W));
+    if(_px8Cv.width !== cw || _px8Cv.height !== ch){
+      _px8Cv.width = cw; _px8Cv.height = ch;
+    }
+    _px8Ctx.imageSmoothingEnabled = false;
+    _px8Ctx.drawImage(g.canvas, 0, 0, cw, ch);
+    const img = _px8Ctx.getImageData(0, 0, cw, ch);
+    const d = img.data;
+    for(let i=0;i<d.length;i+=4){
+      d[i]   = (d[i]   & 0xE0);
+      d[i+1] = (d[i+1] & 0xE0);
+      d[i+2] = (d[i+2] & 0xC0);
+    }
+    _px8Ctx.putImageData(img, 0, 0);
+    _px8Ready = true;
   }
-  _px8Ctx.imageSmoothingEnabled = false;
-  _px8Ctx.drawImage(g.canvas, 0, 0, cw, ch);
-  const img = _px8Ctx.getImageData(0, 0, cw, ch);
-  const d = img.data;
-  for(let i=0;i<d.length;i+=4){
-    d[i]   = (d[i]   & 0xE0);
-    d[i+1] = (d[i+1] & 0xE0);
-    d[i+2] = (d[i+2] & 0xC0);
-  }
-  _px8Ctx.putImageData(img, 0, 0);
   g.save();
   g.imageSmoothingEnabled = false;
   g.drawImage(_px8Cv, 0, 0, W, H);
@@ -3480,12 +3694,17 @@ function drawPixel8(g, dt, T){
 }
 
 // ============================================================
-// Pop Art · 普普藝術 — ben-day dots, panel grid, primary slabs
+// Pop Art · 普普藝術 — ben-day dots (cached/tiled), panel grid, primary slabs
+// Dot tile is pre-rendered to a small offscreen and `createPattern`-tiled,
+// instead of drawing 10000+ individual arcs every frame.
 // ============================================================
+let _popTileCv = null, _popTileCtx = null;
+let _popTileFrame = 0, _popTilePattern = null;
 function drawPopArt(g, dt, T){
   const t = state.t * 0.001;
   const bass = reactor.bass || 0;
   const beat = state.beatFlash || 0;
+  const q = (window._perf && _perf.quality) || 1;
   const palettes = [
     ['#e94e1b','#f4cf2e','#1d70a2','#f6e7d8'],
     ['#0f0f0f','#f4cf2e','#e94e1b','#1d70a2'],
@@ -3494,7 +3713,7 @@ function drawPopArt(g, dt, T){
   const palette = palettes[Math.floor(t*0.25 + bass*2) % palettes.length];
   const cx = W/2, cy = H/2;
   g.save();
-  // Color slabs in quadrants, semi-transparent so base field shows through
+  // Color slabs
   const quads = [[0,0,cx,cy],[cx,0,cx,cy],[0,cy,cx,cy],[cx,cy,cx,cy]];
   const cycle = Math.floor(t * (0.4 + bass*1.2));
   g.globalAlpha = 0.16 + (reactor.vol||0)*0.18 + beat*0.15;
@@ -3503,21 +3722,42 @@ function drawPopArt(g, dt, T){
     g.fillRect(q[0], q[1], q[2], q[3]);
   });
   g.globalAlpha = 1;
-  // Ben-Day dots — multiply blend, animated
-  g.globalCompositeOperation = 'multiply';
-  const spacing = (12 + Math.sin(t*0.5)*2) * SCALE;
-  const maxDot = (3.2 + bass*2.5) * SCALE;
-  g.fillStyle = '#1a1a1a';
-  for(let y=0; y<H; y+=spacing){
-    const xOff = (Math.floor(y/spacing) % 2) ? spacing*0.5 : 0;
-    for(let x=xOff; x<W; x+=spacing){
-      const wob = Math.sin(x*0.012 + y*0.012 + t*1.3) * 0.4 + 0.6;
-      g.beginPath();
-      g.arc(x, y, Math.max(0, maxDot*wob), 0, TAU);
-      g.fill();
-    }
+
+  // Ben-Day dot pattern — render to small offscreen, tile via createPattern.
+  // Regenerate every 6 frames (or less under perf pressure) so the animation
+  // still pulses but we don't pay 10k arcs per frame.
+  if(!_popTileCv){
+    _popTileCv = document.createElement('canvas');
+    _popTileCtx = _popTileCv.getContext('2d');
   }
+  const interval = q < 0.6 ? 12 : 6;
+  _popTileFrame++;
+  const tileSpacing = Math.max(10, (12 + Math.sin(t*0.5)*2) * SCALE);
+  const tileSize = Math.round(tileSpacing * 8);  // 8×8 dot grid per tile (offset rows = honeycomb)
+  if(_popTileCv.width !== tileSize) {
+    _popTileCv.width = _popTileCv.height = tileSize;
+    _popTilePattern = null;
+  }
+  if(_popTileFrame % interval === 0 || !_popTilePattern){
+    _popTileCtx.clearRect(0, 0, tileSize, tileSize);
+    _popTileCtx.fillStyle = '#1a1a1a';
+    const maxDot = (3.2 + bass*2.5) * SCALE;
+    for(let y=0; y<tileSize; y+=tileSpacing){
+      const xOff = (Math.floor(y/tileSpacing) % 2) ? tileSpacing*0.5 : 0;
+      for(let x=xOff; x<tileSize; x+=tileSpacing){
+        const wob = Math.sin(x*0.012 + y*0.012 + t*1.3) * 0.4 + 0.6;
+        _popTileCtx.beginPath();
+        _popTileCtx.arc(x, y, Math.max(0, maxDot*wob), 0, TAU);
+        _popTileCtx.fill();
+      }
+    }
+    _popTilePattern = g.createPattern(_popTileCv, 'repeat');
+  }
+  g.globalCompositeOperation = 'multiply';
+  g.fillStyle = _popTilePattern;
+  g.fillRect(0, 0, W, H);
   g.globalCompositeOperation = 'source-over';
+
   // Heavy panel borders
   g.strokeStyle = '#0a0a0a';
   g.lineWidth = 5 * SCALE;
