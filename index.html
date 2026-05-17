@@ -4340,6 +4340,35 @@ function _seedInkStroke(){
   };
 }
 
+// Build a brush-stroke polygon by offsetting each centerline point perpendicular
+// to the local direction. Returns {leftEdge[], rightEdge[]} arrays of {x,y}.
+// widthFn(idx, pt) -> half-width at that point. jitterFn(idx)->small offset.
+function _buildStrokePolygon(pts, count, widthFn, jitterFn){
+  const left = [], right = [];
+  for(let i=0; i<count; i++){
+    const p = pts[i];
+    const p0 = pts[Math.max(0, i-1)];
+    const p1 = pts[Math.min(count-1, i+1)];
+    let dx = p1.x - p0.x, dy = p1.y - p0.y;
+    const len = Math.hypot(dx,dy) || 1;
+    const nx = -dy/len, ny = dx/len;
+    const hw = widthFn(i, p);
+    const j  = jitterFn ? jitterFn(i) : 0;
+    left.push({  x: p.x + nx*(hw + j),       y: p.y + ny*(hw + j) });
+    right.push({ x: p.x - nx*(hw - j*0.6),   y: p.y - ny*(hw - j*0.6) });
+  }
+  return { left, right };
+}
+function _fillStrokePolygon(g, poly, fillStyle){
+  g.fillStyle = fillStyle;
+  g.beginPath();
+  g.moveTo(poly.left[0].x, poly.left[0].y);
+  for(let i=1; i<poly.left.length; i++) g.lineTo(poly.left[i].x, poly.left[i].y);
+  for(let i=poly.right.length-1; i>=0; i--) g.lineTo(poly.right[i].x, poly.right[i].y);
+  g.closePath();
+  g.fill();
+}
+
 function drawInkWash(g, dt, T){
   const dts = dt/1000;
   const interval = Math.max(0.40, 1.5 - state.motionSpeed*0.5 - (reactor.mid||0)*0.4);
@@ -4352,7 +4381,7 @@ function drawInkWash(g, dt, T){
   if(_inkStrokes.length > 18) _inkStrokes.splice(0, _inkStrokes.length - 18);
 
   g.save();
-  g.lineCap = 'round';
+  g.lineCap = 'butt';
   g.lineJoin = 'round';
 
   for(let i=_inkStrokes.length-1; i>=0; i--){
@@ -4364,76 +4393,63 @@ function drawInkWash(g, dt, T){
     const fade = s.life < s.fadeStart ? 1
                : 1 - Math.min(1, (s.life - s.fadeStart) / s.fadeDuration);
     if(fade <= 0) continue;
-    const drawCount = Math.max(2, Math.floor(s.pts.length * sweep));
+    const drawCount = Math.max(3, Math.floor(s.pts.length * sweep));
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // LAYER 1 — WET HALO (paper soak: very wide, very faint, soft blur)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    g.strokeStyle = `rgba(${INK_HALO},${0.10 * fade})`;
-    g.lineWidth = s.bodyWidth * 2.6;
+    // Edge jitter — gives the brush organic irregularity instead of geometric capsules.
+    // Cached so it doesn't pulse on every frame.
+    if(!s.edgeJitter){
+      s.edgeJitter = [];
+      for(let k=0; k<s.pts.length; k++){
+        s.edgeJitter.push((Math.sin(k*1.7) + Math.sin(k*4.3)*0.6 + Math.sin(k*9.1)*0.3) * s.bodyWidth * 0.06);
+      }
+    }
+    const jitter = (i) => s.edgeJitter[i] || 0;
+
+    // ─── Width functions per layer ───
+    // Strong taper so the brush truly thins at tips. Width also responds to wetness
+    // (dry sections feather narrower).
+    const wForCore = (idx, p) => s.bodyWidth * 0.42 * (0.15 + p.taper * 0.85) * Math.min(1, p.wet * 1.4);
+    const wForWet  = (idx, p) => s.bodyWidth * 0.55 * (0.30 + p.taper * 0.75);
+    const wForHalo = (idx, p) => s.bodyWidth * 0.95 * (0.40 + p.taper * 0.65);
+
+    // ─── LAYER 1 — Paper-soak HALO (very faint outer bleed) ───
     g.shadowColor = `rgba(${INK_WET},0.4)`;
-    g.shadowBlur = 26 * SCALE;
-    g.beginPath();
-    for(let k=0;k<drawCount;k++){
-      const p = s.pts[k];
-      if(k===0) g.moveTo(p.x, p.y); else g.lineTo(p.x, p.y);
-    }
-    g.stroke();
+    g.shadowBlur = 22 * SCALE;
+    const haloPoly = _buildStrokePolygon(s.pts, drawCount, wForHalo, (k)=>jitter(k)*1.3);
+    _fillStrokePolygon(g, haloPoly, `rgba(${INK_HALO},${0.16 * fade})`);
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // LAYER 2 — WET BLEED EDGE (1.4× width, low alpha, medium blur)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    g.shadowBlur = 8 * SCALE;
-    for(let k=1;k<drawCount;k++){
-      const p0 = s.pts[k-1], p1 = s.pts[k];
-      const bleed = p1.wet * (0.5 + p1.taper*0.5);
-      if(bleed < 0.05) continue;
-      g.strokeStyle = `rgba(${INK_WET},${0.35 * bleed * fade})`;
-      g.lineWidth = s.bodyWidth * 1.35 * (0.55 + p1.taper*0.45);
-      g.beginPath();
-      g.moveTo(p0.x, p0.y);
-      g.lineTo(p1.x, p1.y);
-      g.stroke();
-    }
+    // ─── LAYER 2 — Wet bleed edge (mid alpha, soft) ───
+    g.shadowBlur = 6 * SCALE;
+    const wetPoly = _buildStrokePolygon(s.pts, drawCount, wForWet, (k)=>jitter(k));
+    _fillStrokePolygon(g, wetPoly, `rgba(${INK_WET},${0.45 * fade})`);
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // LAYER 3 — SOLID BLACK CORE (THIS is what makes it look like ink)
-    // Near-100% alpha where the brush is wet. No blur — crisp ink.
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ─── LAYER 3 — SOLID BLACK CORE (the real "ink"). No shadow blur. ───
+    // Drawn as a polygon so the edges follow the taper smoothly instead of
+    // segmented capsules.
     g.shadowBlur = 0;
-    for(let k=1;k<drawCount;k++){
-      const p0 = s.pts[k-1], p1 = s.pts[k];
-      // Only draw solid where stroke is actually WET (≥0.5 wetness)
-      if(p1.wet < 0.5) continue;
-      const intensity = p1.wet * (0.55 + p1.taper*0.45);
-      g.strokeStyle = `rgba(${INK_CORE},${Math.min(0.98, intensity * 1.15) * fade})`;
-      g.lineWidth = s.bodyWidth * 0.55 * (0.4 + p1.taper*0.6);
-      g.beginPath();
-      g.moveTo(p0.x, p0.y);
-      g.lineTo(p1.x, p1.y);
-      g.stroke();
-    }
+    // Build a wet-only polygon: collapse width to 0 on dry sections so the
+    // core path naturally narrows / vanishes in feiBai (飛白) regions.
+    const corePoly = _buildStrokePolygon(s.pts, drawCount, (idx, p) => {
+      if(p.wet < 0.55) return 0.01;        // collapse — dry sections show as gaps
+      return wForCore(idx, p);
+    }, (k)=>jitter(k)*0.5);
+    _fillStrokePolygon(g, corePoly, `rgba(${INK_CORE},${0.96 * fade})`);
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // LAYER 4 — DRY BRUSH STRIATIONS (飛白) — parallel fibres with gaps
-    // Only on segments where wetness < 0.5 (the brush is running out)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ─── LAYER 4 — Dry-brush striations (飛白) for wet < 0.55 segments ───
     for(let k=1;k<drawCount;k++){
       const p0 = s.pts[k-1], p1 = s.pts[k];
-      if(p1.wet >= 0.5) continue;       // wet segments handled above
-      if(p1.wet < 0.05) continue;       // truly empty — skip
+      if(p1.wet >= 0.55) continue;
+      if(p1.wet < 0.05) continue;
       const dx = p1.x - p0.x, dy = p1.y - p0.y;
       const len = Math.hypot(dx, dy) || 1;
       const nx = -dy/len, ny = dx/len;
-      const halfW = s.bodyWidth * 0.5 * (0.4 + p1.taper*0.6);
+      const halfW = s.bodyWidth * 0.5 * (0.3 + p1.taper*0.7);
       for(const fOff of s.fibreOffsets){
-        // Each fibre gets independent dropout — fibres split as brush dries
-        const fibreWet = p1.wet * (0.5 + Math.abs(fOff)*0.5);
-        // Periodic gaps along the stroke specific to this fibre
-        if(Math.sin(k*5 + fOff*23 + s.fibreOffsets.length*7) < (0.4 - p1.wet*0.6)) continue;
-        const off = fOff * halfW * 0.85;
-        g.strokeStyle = `rgba(${INK_CORE},${(0.55 + fibreWet*0.3) * fade})`;
-        g.lineWidth = Math.max(0.7, halfW * 0.18) * SCALE;
+        const fibreWet = p1.wet * (0.55 + Math.abs(fOff)*0.45);
+        if(Math.sin(k*5 + fOff*23 + s.fibreOffsets.length*7) < (0.5 - p1.wet*0.7)) continue;
+        const off = fOff * halfW * 0.9;
+        g.strokeStyle = `rgba(${INK_CORE},${(0.62 + fibreWet*0.3) * fade})`;
+        g.lineWidth = Math.max(0.6, halfW * 0.14);
         g.beginPath();
         g.moveTo(p0.x + nx*off, p0.y + ny*off);
         g.lineTo(p1.x + nx*off, p1.y + ny*off);
@@ -4441,29 +4457,28 @@ function drawInkWash(g, dt, T){
       }
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // LAYER 5 — INK POOLS + DRIPS (concentration + gravity drip)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ─── LAYER 5 — Ink pools + drips ───
     for(const pool of s.pools){
       const poolGrow = Math.min(1, Math.max(0, s.life * 0.5 - 0.4));
       if(poolGrow <= 0) continue;
       const r = pool.r0 + poolGrow * pool.rGrowth;
-      // Outer wet halo (slow bleed into paper)
+      // Outer wet halo
       g.shadowColor = `rgba(${INK_WET},0.5)`;
-      g.shadowBlur = 16 * SCALE;
-      g.fillStyle = `rgba(${INK_WET},${0.22 * fade})`;
-      g.beginPath(); g.arc(pool.x, pool.y, r * 1.1, 0, TAU); g.fill();
-      // Solid black centre
-      g.shadowBlur = 4 * SCALE;
-      g.fillStyle = `rgba(${INK_CORE},${0.95 * fade})`;
-      g.beginPath(); g.arc(pool.x, pool.y, r * 0.55, 0, TAU); g.fill();
-      // Optional drip — vertical streak with a bead at the tip
+      g.shadowBlur = 14 * SCALE;
+      g.fillStyle = `rgba(${INK_WET},${0.20 * fade})`;
+      g.beginPath(); g.arc(pool.x, pool.y, r * 1.0, 0, TAU); g.fill();
+      // Solid centre — slightly irregular shape via 3 overlapping ellipses
+      g.shadowBlur = 2 * SCALE;
+      g.fillStyle = `rgba(${INK_CORE},${0.94 * fade})`;
+      g.beginPath(); g.arc(pool.x, pool.y, r * 0.5, 0, TAU); g.fill();
+      g.beginPath(); g.arc(pool.x + r*0.12, pool.y - r*0.08, r * 0.42, 0, TAU); g.fill();
+      g.beginPath(); g.arc(pool.x - r*0.10, pool.y + r*0.05, r * 0.40, 0, TAU); g.fill();
+      // Drip — narrow tapered streak with bead at tip
       if(pool.hasDrip && poolGrow > 0.4){
         const dripT = (poolGrow - 0.4) / 0.6;
         const dripLen = r * 0.6 + dripT * r * 3.5;
         const tipR = r * 0.18 * (1 - dripT*0.3);
-        // Drip body — narrow tapered streak
-        g.shadowBlur = 2 * SCALE;
+        g.shadowBlur = 1 * SCALE;
         g.fillStyle = `rgba(${INK_CORE},${0.88 * fade})`;
         g.beginPath();
         g.moveTo(pool.x - r*0.18, pool.y + r*0.3);
@@ -4472,17 +4487,14 @@ function drawInkWash(g, dt, T){
         g.quadraticCurveTo(pool.x + r*0.05, pool.y + dripLen*0.6, pool.x + r*0.18, pool.y + r*0.3);
         g.closePath();
         g.fill();
-        // Tip bead — a heavier drop at the bottom
-        g.fillStyle = `rgba(${INK_CORE},${0.95 * fade})`;
+        g.fillStyle = `rgba(${INK_CORE},${0.96 * fade})`;
         g.beginPath();
         g.arc(pool.x, pool.y + dripLen + tipR*0.5, tipR, 0, TAU);
         g.fill();
       }
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // LAYER 6 — BEAT SPLASH (bass-triggered ink spatters)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ─── LAYER 6 — Beat splash (bass-triggered ink spatters) ───
     if(s.isBeatSplash && !s.splashSpawned){
       s.splashSpawned = true;
       s.splashes = [];
@@ -4499,7 +4511,7 @@ function drawInkWash(g, dt, T){
       }
     }
     if(s.splashes){
-      g.shadowBlur = 3 * SCALE;
+      g.shadowBlur = 2 * SCALE;
       for(const sp of s.splashes){
         g.fillStyle = `rgba(${INK_CORE},${0.85 * fade})`;
         g.beginPath(); g.arc(sp.x, sp.y, sp.r, 0, TAU); g.fill();
