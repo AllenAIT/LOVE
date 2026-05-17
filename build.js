@@ -41,10 +41,13 @@ const OBF_OPTIONS = {
   controlFlowFlattening: false,       // can break event callbacks + perf
   deadCodeInjection: false,
   identifierNamesGenerator: 'mangled',
-  renameGlobals: false,                // CRITICAL: must keep so DOM refs (getElementById names) work
-  stringArray: true,
-  stringArrayThreshold: 0.5,
-  stringArrayEncoding: ['base64'],
+  renameGlobals: false,                // CRITICAL: must keep so DOM refs work
+  // String array DISABLED — when two obfuscated scripts run on the same page,
+  // the shared global state can corrupt under certain conditions, producing
+  // "Cannot read properties of undefined (reading 'charAt')" errors at runtime.
+  // Identifier mangling alone still provides meaningful protection.
+  stringArray: false,
+  stringArrayThreshold: 0,
   splitStrings: false,
   transformObjectKeys: false,          // keep object keys readable so HTML interop survives
   unicodeEscapeSequence: false,
