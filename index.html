@@ -7102,11 +7102,16 @@ function applyRecordResolution(){
   const q = effectiveRecordQuality();
   const cfg = REC_QUALITY[q] || REC_QUALITY['720'];
   const targetPR = cfg.height / innerHeight;
+  const beforeW = cv.width, beforeH = cv.height;
   // Only boost — never downscale below what user already has
-  if(targetPR <= state.pixelRatio + 0.05) return cfg;
+  if(targetPR <= state.pixelRatio + 0.05){
+    console.log(`[IW] record · selected ${q}, but canvas already ≥ target. Recording at native ${beforeW}×${beforeH} (window: ${innerWidth}×${innerHeight}, pixelRatio: ${state.pixelRatio})`);
+    return cfg;
+  }
   state._recPixelRatioBackup = state.pixelRatio;
   state.pixelRatio = targetPR;
   if(typeof resize === 'function') resize();
+  console.log(`[IW] record · BOOSTED for ${q}: pixelRatio ${state._recPixelRatioBackup} → ${targetPR.toFixed(2)}, canvas ${beforeW}×${beforeH} → ${cv.width}×${cv.height}`);
   return cfg;
 }
 
