@@ -7745,31 +7745,137 @@ window._drawImageTop = function(g, dt){
 // Paths come from Claude (parsed JSON) or a small fallback sprite table
 // keyed on common keywords (心臟/heart, 大象/elephant, 魚/fish, 花/flower).
 // ============================================================
-const SKETCH_FALLBACK = {
-  // Picasso-style 1-3 path glyphs in viewBox 200x200
-  '心臟': { paths: ['M 100 70 C 100 50 70 35 55 55 C 35 80 60 110 100 150 C 140 110 165 80 145 55 C 130 35 100 50 100 70 Z'], anim:'pulse' },
-  'heart':{ paths: ['M 100 70 C 100 50 70 35 55 55 C 35 80 60 110 100 150 C 140 110 165 80 145 55 C 130 35 100 50 100 70 Z'], anim:'pulse' },
-  '大象': { paths: [
-    'M 40 130 Q 35 90 65 75 Q 95 60 130 75 Q 160 85 165 115 L 165 150 L 145 150 L 145 130 L 110 130 L 110 150 L 90 150 L 90 132 Q 70 132 50 130 L 50 150 L 35 150 Z',
-    'M 165 115 Q 178 110 175 130 Q 172 145 165 145'
-  ], anim:'breathe' },
-  'elephant': { paths: [
-    'M 40 130 Q 35 90 65 75 Q 95 60 130 75 Q 160 85 165 115 L 165 150 L 145 150 L 145 130 L 110 130 L 110 150 L 90 150 L 90 132 Q 70 132 50 130 L 50 150 L 35 150 Z',
-    'M 165 115 Q 178 110 175 130 Q 172 145 165 145'
-  ], anim:'breathe' },
-  '魚':   { paths: ['M 40 100 Q 90 60 130 100 Q 90 140 40 100 M 130 100 L 165 75 L 160 100 L 165 125 Z M 80 95 A 3 3 0 0 1 80 95.1'], anim:'drift' },
-  'fish': { paths: ['M 40 100 Q 90 60 130 100 Q 90 140 40 100 M 130 100 L 165 75 L 160 100 L 165 125 Z M 80 95 A 3 3 0 0 1 80 95.1'], anim:'drift' },
-  '花':   { paths: [
-    'M 100 100 m -8 -8 a 12 12 0 1 0 16 0 a 12 12 0 1 0 -16 0',
-    'M 100 70 Q 80 80 100 100 Q 120 80 100 70 M 130 100 Q 120 80 100 100 Q 120 120 130 100 M 100 130 Q 120 120 100 100 Q 80 120 100 130 M 70 100 Q 80 120 100 100 Q 80 80 70 100',
-    'M 100 100 L 100 175'
-  ], anim:'breathe' },
-  'flower':{ paths: [
-    'M 100 100 m -8 -8 a 12 12 0 1 0 16 0 a 12 12 0 1 0 -16 0',
-    'M 100 70 Q 80 80 100 100 Q 120 80 100 70 M 130 100 Q 120 80 100 100 Q 120 120 130 100 M 100 130 Q 120 120 100 100 Q 80 120 100 130 M 70 100 Q 80 120 100 100 Q 80 80 70 100',
-    'M 100 100 L 100 175'
-  ], anim:'breathe' },
-};
+// Picasso-style 1-3 path glyphs in viewBox 200x200. Each entry has aliases
+// (Chinese + English) so the same sprite triggers regardless of input language.
+const _SKETCH_DEFS = [
+  { keys:['心臟','heart','心','heartbeat'], anim:'pulse',
+    paths:['M 100 75 C 95 55 75 45 60 55 C 40 70 45 105 100 150 C 155 105 160 70 140 55 C 125 45 105 55 100 75'] },
+  // Elephant — single continuous one-line drawing (Picasso-style trace).
+  // Goes: forehead → ear loop → trunk wave → mouth → front leg → belly →
+  // back leg → tail → back → behind ear → returns near start.
+  { keys:['大象','elephant','象'], anim:'breathe',
+    paths:['M 65 70 C 50 50 75 35 95 45 C 110 35 135 40 145 60 C 158 60 165 75 158 90 C 165 95 162 110 150 110 C 142 115 130 112 125 105 C 125 115 118 122 110 120 C 105 115 108 105 115 100 C 108 95 95 100 90 110 C 88 125 80 140 78 155 C 72 168 60 170 58 158 C 60 145 65 135 70 125 C 75 115 80 108 78 100 C 70 105 60 110 55 115 C 50 122 50 135 55 150 C 60 165 52 170 45 165 C 38 155 40 135 48 118 C 55 105 60 92 65 85 C 55 80 50 75 65 70'] },
+  // Fish — one curve: body outline → tail fan → swoops back through eye-stop.
+  { keys:['魚','fish'], anim:'drift',
+    paths:['M 40 100 C 60 70 100 65 130 95 C 145 80 158 75 168 80 C 162 95 162 105 168 120 C 158 125 145 120 130 105 C 100 135 60 130 40 100 M 78 92 C 78 90 82 90 82 92 C 82 94 78 94 78 92'] },
+  { keys:['花','flower'], anim:'breathe',
+    paths:[
+      'M 100 100 m -8 -8 a 12 12 0 1 0 16 0 a 12 12 0 1 0 -16 0',
+      'M 100 70 Q 80 80 100 100 Q 120 80 100 70 M 130 100 Q 120 80 100 100 Q 120 120 130 100 M 100 130 Q 120 120 100 100 Q 80 120 100 130 M 70 100 Q 80 120 100 100 Q 80 80 70 100',
+      'M 100 100 L 100 175'] },
+  { keys:['兔','兔子','rabbit','bunny'], anim:'breathe',
+    paths:[
+      'M 100 145 Q 60 145 65 115 Q 65 90 90 90 Q 110 90 115 100 Q 145 100 145 130 Q 145 150 100 150 Z',
+      'M 78 90 Q 72 55 86 48 Q 94 70 88 90',
+      'M 108 88 Q 106 50 122 46 Q 128 70 118 90',
+      'M 92 118 A 2 2 0 0 1 92 118.1 M 122 118 A 2 2 0 0 1 122 118.1'] },
+  { keys:['鳥','bird'], anim:'drift',
+    paths:[
+      'M 30 100 Q 70 60 100 90 Q 130 60 170 100',
+      'M 90 92 Q 100 100 110 92'] },
+  { keys:['貓','cat'], anim:'breathe',
+    paths:[
+      'M 60 110 Q 60 78 100 78 Q 140 78 140 110 Q 140 145 100 145 Q 60 145 60 110 Z',
+      'M 65 88 L 70 55 L 85 80 M 135 88 L 130 55 L 115 80',
+      'M 90 110 A 2 2 0 0 1 90 110.1 M 110 110 A 2 2 0 0 1 110 110.1',
+      'M 100 122 Q 95 130 90 128 M 100 122 Q 105 130 110 128',
+      'M 70 122 L 50 118 M 70 126 L 50 130 M 130 122 L 150 118 M 130 126 L 150 130'] },
+  { keys:['狗','dog','犬'], anim:'breathe',
+    paths:[
+      'M 50 130 L 50 95 Q 50 75 70 75 L 75 60 L 90 75 L 130 75 Q 160 75 160 100 L 160 130 L 145 130 L 145 110 L 115 110 L 115 130 L 100 130 L 100 110 L 65 110 L 65 130 Z',
+      'M 158 110 Q 175 115 173 130'] },
+  { keys:['蝴蝶','butterfly','蝶'], anim:'pulse',
+    paths:[
+      'M 100 80 L 100 140',
+      'M 100 100 Q 60 60 40 90 Q 40 130 80 130 Q 95 120 100 100 Q 105 120 120 130 Q 160 130 160 90 Q 140 60 100 100 Z',
+      'M 100 80 Q 96 70 92 65 M 100 80 Q 104 70 108 65'] },
+  { keys:['蛇','snake'], anim:'drift',
+    paths:[
+      'M 30 100 Q 60 70 90 100 Q 120 130 150 100 Q 170 80 170 95 L 165 100 L 170 105 M 165 100 L 175 105',
+      'M 168 98 A 1.5 1.5 0 0 1 168 98.1'] },
+  { keys:['龜','烏龜','turtle'], anim:'breathe',
+    paths:[
+      'M 60 115 Q 60 80 100 80 Q 140 80 140 115 Q 140 130 100 130 Q 60 130 60 115 Z',
+      'M 70 88 L 95 78 L 100 88 L 105 78 L 130 88',
+      'M 75 130 L 70 145 M 125 130 L 130 145 M 95 132 L 92 148 M 105 132 L 108 148',
+      'M 140 105 Q 158 105 155 115 Q 152 122 140 118',
+      'M 152 108 A 1 1 0 0 1 152 108.1'] },
+  { keys:['鹿','deer'], anim:'static',
+    paths:[
+      'M 75 145 L 75 100 Q 75 85 90 85 L 115 85 Q 130 85 130 100 L 130 145',
+      'M 90 85 L 95 70 M 95 70 L 92 60 M 95 70 L 100 62',
+      'M 115 85 L 110 70 M 110 70 L 113 60 M 110 70 L 105 62',
+      'M 75 100 Q 70 95 65 100 M 130 100 Q 135 95 140 100'] },
+  { keys:['馬','horse'], anim:'static',
+    paths:[
+      'M 40 100 Q 40 80 60 70 L 80 50 Q 95 55 95 75 L 150 90 Q 165 95 165 110 L 165 140 L 150 140 L 150 120 L 130 120 L 130 140 L 80 140 L 80 120 L 60 120 L 60 140 L 45 140 Z',
+      'M 80 50 Q 75 40 80 35'] },
+  { keys:['月','moon','月亮'], anim:'breathe',
+    paths:['M 120 50 A 55 55 0 1 0 120 150 A 40 40 0 1 1 120 50 Z'] },
+  { keys:['太陽','sun'], anim:'pulse',
+    paths:[
+      'M 100 100 m -28 0 a 28 28 0 1 0 56 0 a 28 28 0 1 0 -56 0',
+      'M 100 50 L 100 65 M 100 135 L 100 150 M 50 100 L 65 100 M 135 100 L 150 100',
+      'M 65 65 L 75 75 M 125 125 L 135 135 M 65 135 L 75 125 M 125 75 L 135 65'] },
+  { keys:['星','star','星星'], anim:'pulse',
+    paths:['M 100 50 L 115 88 L 155 90 L 122 115 L 132 155 L 100 132 L 68 155 L 78 115 L 45 90 L 85 88 Z'] },
+  { keys:['雲','cloud'], anim:'drift',
+    paths:['M 50 115 Q 50 95 70 95 Q 75 80 95 80 Q 110 70 130 80 Q 150 80 155 100 Q 170 100 170 115 Q 170 130 150 130 L 70 130 Q 50 130 50 115 Z'] },
+  { keys:['樹','tree'], anim:'breathe',
+    paths:[
+      'M 100 160 L 100 100',
+      'M 70 100 Q 50 80 75 65 Q 80 50 100 55 Q 120 50 130 65 Q 150 80 130 100 Z',
+      'M 100 100 L 80 80 M 100 110 L 120 90 M 100 130 L 85 115 M 100 130 L 115 115'] },
+  { keys:['山','mountain'], anim:'static',
+    paths:[
+      'M 30 150 L 70 90 L 95 120 L 130 60 L 170 150 Z',
+      'M 60 100 L 70 95 L 80 105 M 115 80 L 125 75 L 138 90'] },
+  { keys:['浪','wave','波浪'], anim:'drift',
+    paths:[
+      'M 30 100 Q 55 70 80 100 T 130 100 T 180 100',
+      'M 30 130 Q 55 100 80 130 T 130 130 T 180 130'] },
+  { keys:['眼','eye','眼睛'], anim:'pulse',
+    paths:[
+      'M 40 100 Q 100 50 160 100 Q 100 150 40 100 Z',
+      'M 100 100 m -16 0 a 16 16 0 1 0 32 0 a 16 16 0 1 0 -32 0',
+      'M 100 100 m -6 0 a 6 6 0 1 0 12 0 a 6 6 0 1 0 -12 0'] },
+  { keys:['腦','brain'], anim:'pulse',
+    paths:[
+      'M 55 100 Q 55 60 95 60 Q 100 50 110 60 Q 145 60 145 100 Q 150 130 110 145 Q 100 150 90 145 Q 55 130 55 100 Z',
+      'M 100 60 L 100 145',
+      'M 70 80 Q 85 90 85 105 Q 85 120 70 130 M 130 80 Q 115 90 115 105 Q 115 120 130 130'] },
+  { keys:['手','hand'], anim:'static',
+    paths:[
+      'M 70 160 L 70 105 Q 70 95 80 95 L 80 60 Q 80 50 90 50 Q 100 50 100 60 L 100 92 Q 100 60 110 60 Q 120 60 120 70 L 120 92 Q 120 65 130 65 Q 140 65 140 75 L 140 92 Q 140 75 150 75 Q 160 75 160 85 L 160 130 Q 160 160 130 160 Z'] },
+  { keys:['火','fire'], anim:'pulse',
+    paths:['M 100 150 Q 60 130 70 100 Q 75 85 85 90 Q 80 70 100 50 Q 100 80 115 75 Q 110 100 125 95 Q 140 110 130 130 Q 125 145 100 150 Z'] },
+  { keys:['葉','leaf','葉子'], anim:'drift',
+    paths:[
+      'M 100 50 Q 50 80 60 130 Q 100 160 140 130 Q 150 80 100 50 Z',
+      'M 100 60 L 100 150',
+      'M 100 90 L 85 100 M 100 110 L 80 120 M 100 80 L 115 90 M 100 100 L 120 110'] },
+  { keys:['雨','rain'], anim:'drift',
+    paths:[
+      'M 50 60 Q 50 45 70 45 Q 75 35 95 38 Q 115 30 130 45 Q 150 45 150 65 Q 150 80 130 80 L 70 80 Q 50 80 50 60 Z',
+      'M 70 95 L 65 115 M 90 100 L 85 125 M 110 95 L 105 115 M 130 100 L 125 120',
+      'M 80 130 L 75 150 M 100 135 L 95 155 M 120 130 L 115 150'] },
+  { keys:['風','wind'], anim:'drift',
+    paths:[
+      'M 30 70 Q 90 60 130 80 Q 150 90 160 75',
+      'M 30 105 Q 100 95 145 110 Q 165 115 170 100',
+      'M 30 140 Q 80 130 110 145'] },
+];
+// Flatten to lookup map (lowercased keys).
+const SKETCH_FALLBACK = (() => {
+  const m = {};
+  for(const def of _SKETCH_DEFS){
+    for(const k of def.keys){
+      m[k] = { paths: def.paths, anim: def.anim };
+      m[k.toLowerCase()] = { paths: def.paths, anim: def.anim };
+    }
+  }
+  return m;
+})();
 
 function drawSketch(g, dt){
   const s = state.sketch;
@@ -7780,14 +7886,15 @@ function drawSketch(g, dt){
   const oy = H/2 - vh*scale/2 - vy*scale;
   const t = state.t * 0.001;
   // anim transforms
-  let sx = 1, sy = 1, tx = 0, ty = 0, lineWidth = 3.5 * SCALE;
+  let sx = 1, sy = 1, tx = 0, ty = 0;
+  let lineWidth = 1.8 * SCALE;  // thinner = more elegant one-line drawing feel
   if(s.anim === 'pulse'){
     const beat = (reactor.bass || 0)*0.4 + 0.5 + 0.5*Math.sin(t * 2.5);
-    sx = sy = 1 + beat*0.18;
-    lineWidth = 3.5 * SCALE * (1 + beat*0.4);
+    sx = sy = 1 + beat*0.16;
+    lineWidth = 1.8 * SCALE * (1 + beat*0.4);
   } else if(s.anim === 'breathe'){
     const b = 0.5 + 0.5*Math.sin(t * 0.8);
-    sx = sy = 1 + b*0.05;
+    sx = sy = 1 + b*0.04;
   } else if(s.anim === 'drift'){
     tx = Math.sin(t * 0.4) * W * 0.05;
     ty = Math.sin(t * 0.6) * H * 0.04;
@@ -7796,23 +7903,26 @@ function drawSketch(g, dt){
   g.translate(W/2 + tx, H/2 + ty);
   g.scale(sx, sy);
   g.translate(-W/2, -H/2);
-  g.strokeStyle = state.lightMode ? '#0a0a14' : '#f5efe3';
-  g.lineWidth = lineWidth;
+  const inkColor = state.lightMode ? '#0a0a14' : '#f5efe3';
   g.lineCap = 'round';
   g.lineJoin = 'round';
   for(const d of s.paths){
     try {
-      const p = new Path2D();
-      // canvas Path2D supports SVG path data via constructor argument
       const p2 = new Path2D(d);
       g.save();
       g.translate(ox, oy);
       g.scale(scale, scale);
+      // Hand-drawn double-pass: a soft wider ghost stroke under a sharper main stroke.
+      // Gives the "drawn with a pencil" warmth of true one-line art.
+      g.strokeStyle = inkColor;
+      g.globalAlpha = 0.22;
+      g.lineWidth = (lineWidth * 2.4) / scale;
+      g.stroke(p2);
+      g.globalAlpha = 0.92;
+      g.lineWidth = lineWidth / scale;
       g.stroke(p2);
       g.restore();
-    } catch(e){
-      // skip malformed paths
-    }
+    } catch(e){ /* skip malformed paths */ }
   }
   g.restore();
 }
@@ -7840,21 +7950,35 @@ async function generateSketch(prompt){
   }
   // No fallback — ask Claude via /api/imagine
   if(hint) hint.textContent = 'drawing…';
-  const sysPrompt = `You draw line-art glyphs. The user asked for: "${prompt}"
+  const sysPrompt = `You are a master of continuous-line drawing (一筆畫 / one-line art / Picasso ligne claire).
+Draw "${prompt}" as a single continuous flowing line.
 
-Respond with ONLY a JSON object, no markdown fences, no explanation:
+Output ONLY valid JSON, no markdown, no prose:
 {
-  "paths": ["M ... L ...", ...],
+  "paths": ["M ... C ... C ...", ...],
   "anim": "pulse" | "breathe" | "drift" | "static",
   "viewBox": [0, 0, 200, 200]
 }
 
-Rules:
-- 1-3 SVG path "d" strings (M/L/C/Q/Z commands only)
-- viewBox is always [0,0,200,200], glyph centered in it
-- Picasso-style single line drawing — minimal, fluid, evocative
-- Pick anim by subject: pulse for body parts (heart/brain/lung), drift for water/fish/wind, breathe for organic/animals/plants, static for geometric objects
-- Output only the JSON. No prose.`;
+CRITICAL style rules — match a Picasso single-line sketch:
+- Prefer ONE path, drawn from start to end without lifting the pen. Use 2 paths only when truly needed (e.g. an eye dot).
+- The path should be made of C (cubic Bezier) curves, NOT straight lines. Organic, flowing, calligraphic.
+- The line should overlap itself, loop, double back — this is how single-line drawings suggest 3D form.
+- viewBox is 0 0 200 200 with the subject centered around (100, 100). Use the full canvas.
+- DO NOT close the path with Z. Let it end where it ends — that's part of the aesthetic.
+- DO NOT add fills. This is pure line.
+- Keep the curve count between 8 and 25 — enough to suggest the form, not so many it gets fussy.
+
+Animation hint (pick one):
+- pulse   — body parts that beat (heart, brain, lung)
+- breathe — animals, plants, organic things at rest
+- drift   — water, fish, wind, clouds, leaves
+- static  — geometric objects, architecture
+
+Example for "cat" (one continuous path):
+{"paths":["M 60 110 C 55 80 75 65 100 70 C 115 55 135 60 140 80 C 155 78 162 95 152 110 C 160 130 145 145 120 142 C 115 150 95 152 85 140 C 65 142 50 130 60 110 M 92 102 C 92 100 96 100 96 102 C 96 104 92 104 92 102"],"anim":"breathe","viewBox":[0,0,200,200]}
+
+Now draw "${prompt}". Output JSON only.`;
   try {
     const r = await fetch('/api/imagine', {
       method: 'POST',
