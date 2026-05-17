@@ -1931,7 +1931,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-17c');
+console.log('[IW] script booting · build 2026-05-17d · lyrics DOM caption');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -3771,9 +3771,12 @@ function loadLyricsFromLRC(lrcText, meta){
   lyrics.meta = meta || null;
   lyrics.enabled = true;
   lyrics._lineShowing = false;
-  // Push the FIRST line to the typography canvas right now — confirms the wiring
-  // works without having to play audio. When playback starts, tickLyricsSync will
-  // overwrite with the actual current line based on audio.currentTime.
+  // Push the FIRST line to the DOM caption + typography canvas right now —
+  // confirms the wiring works without having to play audio. Caption call is
+  // first/separate so it shows even if _applyLyricToTypo throws downstream.
+  if(typeof _setLyricCaption === 'function'){
+    _setLyricCaption(lines[0].text);
+  }
   if(typeof _applyLyricToTypo === 'function'){
     _applyLyricToTypo(lines[0].text);
   }
@@ -3789,43 +3792,66 @@ function clearLyrics(){
 }
 
 // DOM caption overlay — guaranteed-visible subtitle that mirrors the current
-// lyric line, regardless of what the canvas typography path is doing. Created
-// lazily on first use; bottom-center, large font, high z-index.
+// lyric line, regardless of what the canvas typography path is doing.
+// Created eagerly on script load so we know up-front whether DOM injection works.
 function _ensureLyricCaptionEl(){
   let el = document.getElementById('lyricsCaptionOverlay');
   if(el) return el;
   el = document.createElement('div');
   el.id = 'lyricsCaptionOverlay';
   el.style.cssText = [
-    'position:fixed','left:50%','bottom:8vh','transform:translateX(-50%)',
-    'max-width:90vw','padding:14px 26px','border-radius:14px',
-    'background:rgba(0,0,0,.55)','backdrop-filter:blur(8px)',
-    '-webkit-backdrop-filter:blur(8px)',
-    'color:#fff','font-family:"Recursive","Noto Sans TC",sans-serif',
-    'font-size:clamp(20px,3.6vw,44px)','font-weight:500',
+    'position:fixed','left:50%','bottom:12vh','transform:translateX(-50%)',
+    'max-width:92vw','padding:18px 30px','border-radius:16px',
+    'background:rgba(0,0,0,.65)','backdrop-filter:blur(10px)',
+    '-webkit-backdrop-filter:blur(10px)',
+    'color:#fff','font-family:"Recursive","Noto Sans TC","Noto Sans JP",sans-serif',
+    'font-size:clamp(22px,4vw,52px)','font-weight:600',
     'letter-spacing:.02em','text-align:center','line-height:1.3',
-    'text-shadow:0 2px 12px rgba(0,0,0,.7),0 0 24px rgba(0,0,0,.5)',
+    'text-shadow:0 2px 14px rgba(0,0,0,.85),0 0 32px rgba(0,0,0,.6)',
+    'border:1px solid rgba(255,255,255,.18)',
     'z-index:2147483600','pointer-events:none',
-    'opacity:0','transition:opacity .15s ease-out',
-    'display:none'
+    'opacity:0','transition:opacity .18s ease-out',
+    'display:none','white-space:pre-wrap','user-select:none'
   ].join(';');
-  document.body.appendChild(el);
+  if(document.body){
+    document.body.appendChild(el);
+    console.log('[IW] lyric caption overlay injected · id=lyricsCaptionOverlay');
+  } else {
+    // body not ready yet — retry once DOM parsed
+    document.addEventListener('DOMContentLoaded', () => {
+      if(!document.getElementById('lyricsCaptionOverlay')){
+        document.body.appendChild(el);
+        console.log('[IW] lyric caption overlay injected (deferred)');
+      }
+    }, { once:true });
+  }
   return el;
 }
 function _setLyricCaption(text){
-  const el = _ensureLyricCaptionEl();
-  if(!text){
-    el.style.opacity = '0';
-    // hide after fade
-    setTimeout(() => { if(el.style.opacity === '0') el.style.display = 'none'; }, 200);
-    return;
+  try {
+    const el = _ensureLyricCaptionEl();
+    if(!el) return;
+    if(!text){
+      el.style.opacity = '0';
+      setTimeout(() => { if(el.style.opacity === '0') el.style.display = 'none'; }, 220);
+      return;
+    }
+    el.textContent = text;
+    el.style.display = 'block';
+    void el.offsetWidth;  // force reflow so transition fires from 0
+    el.style.opacity = '1';
+  } catch(err){
+    console.warn('[IW] _setLyricCaption error:', err);
   }
-  el.textContent = text;
-  el.style.display = 'block';
-  // force reflow so transition fires from 0
-  void el.offsetWidth;
-  el.style.opacity = '1';
 }
+// Create overlay immediately so its presence is verifiable from the start.
+// Brief "ready" pulse so the user sees the bar appear once on load.
+_ensureLyricCaptionEl();
+window._lyricCaption = _setLyricCaption;  // expose for console testing
+setTimeout(() => {
+  _setLyricCaption('✓ lyric caption ready');
+  setTimeout(() => _setLyricCaption(''), 1400);
+}, 300);
 
 // Clear any lyric currently displayed (for long instrumental gaps + end of song).
 // Immediate cut — wipes spawned words, center text, and typewriter state so the
