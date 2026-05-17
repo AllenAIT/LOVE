@@ -1926,7 +1926,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-17f · canvas-only lyrics');
+console.log('[IW] script booting · build 2026-05-17g · canvas lyrics, no early-return');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -9016,11 +9016,9 @@ function spawnWord(text){
 function drawTypography(g, dt, T){
   const _lyricsActive = (typeof lyrics !== 'undefined' && lyrics.enabled);
   const phrases = typo.phrases();
+  // typo.text === '' (after _clearLyricFromTypo) is the signal that we're
+  // between lines — drawTypography exits via the empty-phrases check below.
   if(!phrases.length) return;
-  // When lyrics is driving and no line is currently showing (between lines /
-  // instrumental gap), don't fall back to a random default phrase from the
-  // morphCenter / typewriter / spawn pools.
-  if(_lyricsActive && !lyrics._lineShowing) return;
   const t0 = state.t/1000;
   const sp = typo.speed;       // animation speed multiplier
   const dts = dt/1000;          // dt in seconds
@@ -9029,8 +9027,7 @@ function drawTypography(g, dt, T){
   if(typo.anim === 'morphCenter'){
     const swapInterval = (3/Math.max(0.5,typo.rate)) / sp;
     if(!typo.centerCurrent){
-      // Don't seed from default phrases when lyrics is driving — wait for next line.
-      if(_lyricsActive) return;
+      // Seed from current phrases pool (when lyrics is driving, phrases = [lyric]).
       typo.centerCurrent = phrases[Math.floor(Math.random()*phrases.length)];
       typo.centerSwapT = t0 + swapInterval;
       typo.centerSize = pickSizeFromMode();
@@ -9046,7 +9043,6 @@ function drawTypography(g, dt, T){
   }
   if(typo.anim === 'typewriter'){
     if(!typo._tw){
-      if(_lyricsActive) return;  // wait for next lyric line; don't pick from defaults
       typo._tw = { phrase: phrases[Math.floor(Math.random()*phrases.length)], t0, dir:1, idx:0, size: pickSizeFromMode() };
     }
     const sec = (t0 - typo._tw.t0) * sp;
@@ -9070,10 +9066,11 @@ function drawTypography(g, dt, T){
   }
 
   // —— Spawn-based animations ——
-  // When lyrics is driving, _applyLyricToTypo() spawns ONE word per line change.
-  // Skip auto-spawn so we don't stack copies of the same line on the screen.
-  const _lyricsDriving = (typeof lyrics !== 'undefined' && lyrics.enabled);
-  if(!_lyricsDriving && (typo.loop || typo.spawns.length === 0)){
+  // Auto-spawn from the current phrases pool. When lyrics is driving, that pool
+  // is [current lyric line], so the lyric stays continuously visible (and gets
+  // re-spawned so it doesn't fade out mid-line). Line end clears typo.text →
+  // phrases becomes [] → drawTypography early-returns above → no spawn.
+  if(typo.loop || typo.spawns.length === 0){
     typo.spawnAcc += dts * sp;
     const need = 1 / Math.max(0.05, typo.rate);
     let safety = 8;
