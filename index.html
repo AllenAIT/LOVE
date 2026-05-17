@@ -1926,7 +1926,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-17e · lyrics caption CENTER');
+console.log('[IW] script booting · build 2026-05-17f · canvas-only lyrics');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -3786,118 +3786,13 @@ function clearLyrics(){
   if(typeof _setLyricCaption === 'function') _setLyricCaption('');
 }
 
-// DOM caption overlay — guaranteed-visible subtitle, CENTER of screen.
-// Created eagerly on script load and re-injected aggressively (attached to
-// <html> rather than <body> in case body has transforms / overflow:hidden that
-// would clip a fixed-position child).
-function _ensureLyricCaptionEl(){
-  let el = document.getElementById('lyricsCaptionOverlay');
-  if(el && el.isConnected) return el;
-  el = document.createElement('div');
-  el.id = 'lyricsCaptionOverlay';
-  el.setAttribute('aria-live','polite');
-  // Use cssText with !important so app stylesheets can't override
-  el.style.cssText = [
-    'position:fixed !important',
-    'left:50% !important',
-    'top:50% !important',
-    'transform:translate(-50%,-50%) !important',
-    'max-width:92vw !important',
-    'padding:0 !important',
-    'background:transparent !important',
-    'color:#fff !important',
-    'font-family:"Recursive","Noto Sans TC","Noto Sans JP",sans-serif !important',
-    'font-size:clamp(32px,6vw,84px) !important',
-    'font-weight:600 !important',
-    'text-align:center !important',
-    'line-height:1.25 !important',
-    'text-shadow:0 2px 18px rgba(0,0,0,.85),0 0 36px rgba(0,0,0,.55) !important',
-    'border:none !important',
-    'z-index:2147483647 !important',
-    'pointer-events:none !important',
-    'opacity:0',
-    'transition:opacity .2s ease-out',
-    'display:none',
-    'white-space:pre-wrap',
-    'user-select:none'
-  ].join(';');
-  // Attach to <html> so body transforms/clipping can't hide it
-  const host = document.documentElement || document.body;
-  if(host){
-    host.appendChild(el);
-    console.log('[IW] lyric caption overlay injected → ' + host.tagName);
-  } else {
-    document.addEventListener('DOMContentLoaded', () => {
-      (document.documentElement || document.body).appendChild(el);
-    }, { once:true });
-  }
-  return el;
-}
-// Mirror the Type tab's font / color / weight / outline onto the caption.
-// Called whenever the caption text is set, so each new lyric line picks up
-// the latest Type tab choices. Anim isn't replicated — canvas does that.
-function _applyCaptionStyleFromTypo(el){
-  if(!el) return;
-  try {
-    if(typeof typo === 'undefined' || !typo) return;
-    const stack = (typeof fontStack === 'function')
-      ? fontStack()
-      : '"Recursive","Noto Sans TC","Noto Sans JP",sans-serif';
-    const col = (typeof pickColor === 'function') ? pickColor() : '#ffffff';
-    const w = typo.weight || 600;
-    el.style.setProperty('font-family', stack, 'important');
-    el.style.setProperty('font-weight', String(w), 'important');
-    const style = typo.style || 'solid';
-    if(style === 'outline'){
-      el.style.setProperty('color', 'transparent', 'important');
-      el.style.setProperty('-webkit-text-stroke', `2px ${col}`, 'important');
-      el.style.setProperty('text-stroke', `2px ${col}`, 'important');
-    } else {
-      el.style.setProperty('color', col, 'important');
-      el.style.setProperty('-webkit-text-stroke', '0', 'important');
-      el.style.setProperty('text-stroke', '0', 'important');
-    }
-    // Pulse opacity if anim is 'breathe' (CSS-level only, won't fight other anims)
-    if(typo.anim === 'breathe'){
-      el.style.setProperty('animation', 'iwCaptionBreathe 2.2s ease-in-out infinite', 'important');
-    } else if(typo.anim === 'popIn'){
-      el.style.setProperty('animation', 'iwCaptionPop .45s cubic-bezier(.34,1.56,.64,1)', 'important');
-    } else {
-      el.style.setProperty('animation', 'none', 'important');
-    }
-  } catch(err){ console.warn('[IW] caption style sync error:', err); }
-}
-function _setLyricCaption(text){
-  try {
-    const el = _ensureLyricCaptionEl();
-    if(!el) return;
-    if(!text){
-      el.style.opacity = '0';
-      setTimeout(() => { if(el.style.opacity === '0') el.style.display = 'none'; }, 220);
-      return;
-    }
-    _applyCaptionStyleFromTypo(el);
-    el.textContent = text;
-    el.style.display = 'block';
-    void el.offsetWidth;
-    el.style.opacity = '1';
-  } catch(err){
-    console.warn('[IW] _setLyricCaption error:', err);
-  }
-}
-// Refresh current caption styling (called when user fiddles with Type tab controls)
-window._refreshLyricCaption = function(){
-  const el = document.getElementById('lyricsCaptionOverlay');
-  if(el && el.style.display !== 'none') _applyCaptionStyleFromTypo(el);
-};
-// Poll every 200ms while caption visible so Type tab changes apply in real time
-// (font/color/weight/anim swap shows up immediately, not only on next lyric line).
-setInterval(() => {
-  const el = document.getElementById('lyricsCaptionOverlay');
-  if(el && el.style.display !== 'none' && el.style.opacity !== '0'){
-    _applyCaptionStyleFromTypo(el);
-  }
-}, 200);
+// DOM caption overlay removed — canvas typography now handles the lyric directly
+// so the user's full Type tab choices (font / size / anim / style / color) apply
+// natively. These shim functions keep callers happy.
+function _ensureLyricCaptionEl(){ return null; }
+function _applyCaptionStyleFromTypo(){ /* no-op — canvas typography handles styling */ }
+function _setLyricCaption(){ /* no-op — canvas typography handles display */ }
+window._refreshLyricCaption = function(){ /* no-op */ };
 
 // Diagnostic HUD — shows audio time + current lyric line index so the user can
 // see at a glance whether sync is advancing or stuck.
@@ -3938,23 +3833,11 @@ function _updateLyricsHUD(){
   } catch(_){}
 }
 setInterval(_updateLyricsHUD, 250);
-// Inject CSS keyframes for caption anims (once)
-(function _injectCaptionAnimCSS(){
-  if(document.getElementById('iwCaptionAnimCSS')) return;
-  const s = document.createElement('style');
-  s.id = 'iwCaptionAnimCSS';
-  s.textContent = `
-@keyframes iwCaptionBreathe { 0%,100% { transform: translate(-50%,-50%) scale(1); filter: brightness(1); } 50% { transform: translate(-50%,-50%) scale(1.04); filter: brightness(1.15); } }
-@keyframes iwCaptionPop { 0% { transform: translate(-50%,-50%) scale(.6); opacity:0; } 100% { transform: translate(-50%,-50%) scale(1); opacity:1; } }`;
-  document.head && document.head.appendChild(s);
+// Remove any stale caption element from earlier builds
+(function _removeStaleCaption(){
+  const el = document.getElementById('lyricsCaptionOverlay');
+  if(el) el.remove();
 })();
-// Eager-create + visible startup pulse so user can confirm the new build loaded.
-_ensureLyricCaptionEl();
-window._lyricCaption = _setLyricCaption;  // expose for console testing
-setTimeout(() => {
-  _setLyricCaption('✓ build 2026-05-17e · caption ready');
-  setTimeout(() => _setLyricCaption(''), 1800);
-}, 400);
 
 // Clear any lyric currently displayed (for long instrumental gaps + end of song).
 // Immediate cut — wipes spawned words, center text, and typewriter state so the
