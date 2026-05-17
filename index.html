@@ -4825,6 +4825,13 @@ function randomizeAll(){
   state.grain    = Math.random() * 0.75;
   state.vignette = Math.random() * 0.6;
   state.lightMode = Math.random() < 0.15;
+  // Re-tune when light mode is on — keep paper clean, retain ink, less bloom
+  if(state.lightMode){
+    state.bgDark = Math.random() * 0.25;
+    state.trails = 0.30 + Math.random() * 0.40;
+    state.bloom  = Math.random() * 0.30;
+    state.vignette = Math.random() * 0.35;
+  }
 
   // 6. Mirror / kaleido — much more likely on hot/intense music
   if(Math.random() < hot*0.7 + 0.05){
@@ -4847,24 +4854,42 @@ function randomizeAll(){
   const budgetBase = state.pixelRatio >= 2 ? 6 : 8;
   const budget = budgetBase + Math.floor(hot * 2);  // hot music allowed a little more chaos
 
-  const hotModes  = ['crystals','ripples','spiral','tunnel','mandalaRings','halftone','popArt','glitch','polygon','matrix','eva','pixel8'];
-  const coolModes = ['lineTrace','flowField','constellation','ribbons','petals','aurora','waveform','inkWash','polygon','matrix'];
+  // In lightMode (white canvas) bright-content modes vanish — pool MUST favor dark/contrasted content.
+  const lightFriendly = ['inkWash','polygon','popArt','glitch','eva','halftone','lineTrace','constellation','spiral','crystals','tunnel'];
+  const lightHostile  = new Set(['matrix','aurora','ribbons','petals']);  // these wash out on cream bg
+
+  let hotModes, coolModes;
+  if(state.lightMode){
+    hotModes  = ['popArt','glitch','polygon','eva','halftone','spiral','crystals','tunnel','inkWash'];
+    coolModes = ['lineTrace','flowField','constellation','inkWash','polygon','halftone','waveform'];
+  } else {
+    hotModes  = ['crystals','ripples','spiral','tunnel','mandalaRings','halftone','popArt','glitch','polygon','matrix','eva','pixel8'];
+    coolModes = ['lineTrace','flowField','constellation','ribbons','petals','aurora','waveform','inkWash','polygon','matrix'];
+  }
   const maxModes = 3;
   const targetN = Math.min(maxModes, 1 + Math.floor(Math.random()*(1 + hot*2.2)));
   const enabled = new Set();
   let spent = 0;
-  for(let i=0;i<targetN*3 && enabled.size<targetN;i++){  // extra attempts to skip too-expensive picks
+  for(let i=0;i<targetN*4 && enabled.size<targetN;i++){
     const pool = Math.random() < hot*0.7 + 0.15 ? hotModes : coolModes;
     const pick = pool[Math.floor(Math.random()*pool.length)];
     if(enabled.has(pick)) continue;
     // Mutual-exclusion: pixel8 + popArt is murder
     if(pick === 'pixel8' && enabled.has('popArt')) continue;
     if(pick === 'popArt' && enabled.has('pixel8')) continue;
+    // lightMode hostility filter
+    if(state.lightMode && lightHostile.has(pick)) continue;
     const cost = MODE_COST[pick] || 1;
     if(spent + cost > budget) continue;
     enabled.add(pick);
     spent += cost;
     state.modes[pick] = true;
+  }
+  // GUARANTEE at least 1 mode — fallback prevents blank canvas (esp. on lightMode)
+  if(enabled.size === 0){
+    const fallback = state.lightMode ? 'inkWash' : 'flowField';
+    state.modes[fallback] = true;
+    enabled.add(fallback);
   }
   // Kaleido cap: heavy mode (cost ≥ 4) limits kaleido to 4 segs; pixel8 forces it off
   let maxKal = 16;
