@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "build": "node build.js",
-    "build:safe": "OBFUSCATE=false node build.js",
+    "build:safe": "node build.js --safe",
     "dev": "echo \"Open index.html directly in browser, or run: vercel dev\""
   },
   "dependencies": {

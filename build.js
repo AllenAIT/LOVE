@@ -29,7 +29,12 @@ const OUT_HTML  = path.join(OUT_DIR, 'index.html');
 const SRC_API   = path.join(ROOT, 'api');
 const OUT_API   = path.join(OUT_DIR, 'api');
 
-const OBFUSCATE = process.env.OBFUSCATE !== 'false';
+// CLI: --safe / --no-obfuscate, or env OBFUSCATE=false
+const OBFUSCATE = !(
+  process.env.OBFUSCATE === 'false'
+  || process.argv.includes('--safe')
+  || process.argv.includes('--no-obfuscate')
+);
 
 const OBF_OPTIONS = {
   compact: true,
@@ -65,11 +70,15 @@ async function processScript(content, idx) {
     legalComments: 'none',
   });
 
-  // 2. javascript-obfuscator (optional)
+  // 2. javascript-obfuscator (optional). Each script gets a UNIQUE seed so the
+  // generated string-array variable names don't collide across blocks (the
+  // exact bug that broke FAB buttons when two obfuscated scripts shared the
+  // page).
   let final = minified;
   if (OBFUSCATE) {
     try {
-      final = Obfuscator.obfuscate(minified, OBF_OPTIONS).getObfuscatedCode();
+      const opts = { ...OBF_OPTIONS, seed: Math.floor(Math.random() * 0x7fffffff) + idx * 7919 };
+      final = Obfuscator.obfuscate(minified, opts).getObfuscatedCode();
     } catch (err) {
       console.warn(`Obfuscation failed for script ${idx}, using minified version. Reason:`, err.message);
       final = minified;

@@ -481,6 +481,12 @@
   }
   @keyframes midiLearnPulse{ 50%{ background:rgba(255,200,40,.30); } }
 
+  /* Recording quality — locked state for free users */
+  #recQualitySeg button.locked{ opacity:.45; cursor:not-allowed; }
+  #recQualitySeg button.locked:hover{ background:rgba(255,180,40,.10); border-color:rgba(255,180,40,.30); opacity:.7; cursor:pointer; }
+  #recQualitySeg button .rec-lock{ font-size:9px; margin-right:2px; opacity:.8; }
+  #recQualitySeg button:not(.locked) .rec-lock{ display:none; }
+
   /* Phrase library chips */
   .phrase-lib{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
   .phrase-chip{
@@ -1537,6 +1543,18 @@
             <div class="slider"><div class="track"></div><div class="fill" id="tImpFill"></div><div class="thumb" id="tImpThumb"></div>
               <input type="range" min="0" max="250" value="100" id="tImp" />
             </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3 class="section-title">Recording <em style="font-size:11px;color:var(--ink-faint);font-style:normal;letter-spacing:.12em;text-transform:uppercase;margin-left:6px">output resolution</em></h3>
+          <div class="seg" id="recQualitySeg" style="grid-template-columns:repeat(3,1fr)">
+            <button data-q="720" class="on">720p<em>免費</em></button>
+            <button data-q="1080" data-pro="1">1080p<em><span class="rec-lock">🔒</span> 授權</em></button>
+            <button data-q="4k"  data-pro="1">4K<em><span class="rec-lock">🔒</span> 授權</em></button>
+          </div>
+          <div class="type-tip" style="margin-top:6px">
+            <span id="recQualityNote">Free accounts record at 720p. <a href="mailto:ai.allen.task@gmail.com" style="color:#c87cff">Contact</a> for 1080p / 4K license.</span>
           </div>
         </div>
 
@@ -3770,7 +3788,16 @@ function ensureFlow(){
 function dominantEmo(){
   let dom=null, max=0;
   for(const e of EMOTIONS){ if(state.values[e.id] > max){ max = state.values[e.id]; dom = e; } }
-  return dom || EMOTIONS.find(e=>e.id==='hope');
+  dom = dom || EMOTIONS.find(e=>e.id==='hope');
+  // In lightMode (cream paper canvas), clamp emotion .light to dark range so all
+  // downstream HSL-based drawing produces visible content on the bright background.
+  // Most emotions sit at light 50-70 (pastels) which vanish on cream — the cap
+  // forces 18-22% lightness, which after the typical +20 offset in draw funcs
+  // still lands around mid-gray, visible against cream.
+  if(state.lightMode){
+    return { ...dom, light: Math.min(dom.light, 20) };
+  }
+  return dom;
 }
 
 function drawLineTrace(g, dt, T){
@@ -5404,13 +5431,17 @@ function updatePerf(dt){
     }
     // Bigger hammer: drop pixelRatio when fps is really bad. Halves every render cost.
     // Recovers when fps comes back. Only triggers if device started above 1.0.
-    if(perf.avgFps < 28 && state.pixelRatio > 1.0){
-      state.pixelRatio = 1.0;
-      perf.showLow = true; perf.lastShow = now;
-      if(typeof resize === 'function') resize();
-    } else if(perf.avgFps > 55 && state.pixelRatio < perf.maxPixelRatio){
-      state.pixelRatio = perf.maxPixelRatio;
-      if(typeof resize === 'function') resize();
+    // SUPPRESSED during high-res recording — user explicitly chose 4K/1080p, don't betray.
+    const isHighResRec = window._isRecording && window._isRecording() && state._recPixelRatioBackup != null;
+    if(!isHighResRec){
+      if(perf.avgFps < 28 && state.pixelRatio > 1.0){
+        state.pixelRatio = 1.0;
+        perf.showLow = true; perf.lastShow = now;
+        if(typeof resize === 'function') resize();
+      } else if(perf.avgFps > 55 && state.pixelRatio < perf.maxPixelRatio){
+        state.pixelRatio = perf.maxPixelRatio;
+        if(typeof resize === 'function') resize();
+      }
     }
   }
   // show 'optimizing' label briefly
@@ -6546,6 +6577,9 @@ function applyLicense(lic){
     state.noWatermark = false;
     state.licenseInfo = null;
   }
+  if(typeof window._onLicenseChange === 'function'){
+    try { window._onLicenseChange(); } catch(_){}
+  }
 }
 
 // state.previewMode = true when user clicked "Try preview" without registering.
@@ -7005,6 +7039,42 @@ document.body.appendChild(recTimer);
 const recTimerText = recTimer.querySelector('#recTimerText');
 
 let recorder = null, recChunks = [], recStartT = 0, recTickId = 0;
+// Recording quality setting. Free users are pinned to '720'; licensed users
+// can pick '1080' or '4k'. Enforced server-side via state.noWatermark.
+state.recordQuality = '720';
+state._recPixelRatioBackup = null;
+
+// Map quality → target output height + recommended bitrate
+const REC_QUALITY = {
+  '720':  { height: 720,  bitrate:  5_000_000 },
+  '1080': { height: 1080, bitrate: 10_000_000 },
+  '4k':   { height: 2160, bitrate: 24_000_000 },
+};
+
+function effectiveRecordQuality(){
+  // Free users can only do 720p, regardless of UI selection
+  return state.noWatermark ? state.recordQuality : '720';
+}
+
+function applyRecordResolution(){
+  const q = effectiveRecordQuality();
+  const cfg = REC_QUALITY[q] || REC_QUALITY['720'];
+  const targetPR = cfg.height / innerHeight;
+  // Only boost — never downscale below what user already has
+  if(targetPR <= state.pixelRatio + 0.05) return cfg;
+  state._recPixelRatioBackup = state.pixelRatio;
+  state.pixelRatio = targetPR;
+  if(typeof resize === 'function') resize();
+  return cfg;
+}
+
+function restoreRecordResolution(){
+  if(state._recPixelRatioBackup == null) return;
+  state.pixelRatio = state._recPixelRatioBackup;
+  state._recPixelRatioBackup = null;
+  if(typeof resize === 'function') resize();
+}
+
 function pickMime(){
   // Prefer MP4 when the browser can produce it (Safari, recent Chrome with H.264).
   // Fall back to WebM (the common one) on everything else.
@@ -7024,6 +7094,9 @@ function startRecording(){
     showRecMsg('Recording not supported in this browser.');
     return;
   }
+  // Boost canvas resolution to the chosen quality BEFORE captureStream.
+  // captureStream snapshots the canvas dimensions — change after start does nothing.
+  const recCfg = applyRecordResolution();
   const stream = cv.captureStream(30);
   // capture audio from the reactor — only if it's actively running
   try{
@@ -7038,9 +7111,11 @@ function startRecording(){
   const mime = pickMime();
   recChunks = [];
   try{
-    recorder = new MediaRecorder(stream, mime ? {mimeType:mime, videoBitsPerSecond:6_000_000} : {});
+    const bitrate = (recCfg && recCfg.bitrate) || 6_000_000;
+    recorder = new MediaRecorder(stream, mime ? {mimeType:mime, videoBitsPerSecond:bitrate} : {});
   }catch(e){
     console.error('MediaRecorder construction failed', e);
+    restoreRecordResolution();
     showRecMsg('Recording failed to start.');
     return;
   }
@@ -7048,6 +7123,8 @@ function startRecording(){
   recorder.onerror = e => { console.error('MediaRecorder error', e); showRecMsg('Recording error — see console'); };
   const _rec = recorder;  // closure-stable reference for onstop
   recorder.onstop = () => {
+    // Always restore original pixelRatio after recording ends
+    restoreRecordResolution();
     try{
       if(!recChunks.length){
         showRecMsg('No data — recording was empty.');
@@ -7072,6 +7149,7 @@ function startRecording(){
     recorder.start(250);
   }catch(e){
     console.error('recorder.start failed', e);
+    restoreRecordResolution();
     showRecMsg('Could not start recording.');
     recorder = null;
     return;
@@ -7104,6 +7182,40 @@ function stopRecording(){
 recBtn.addEventListener('click', () => recorder ? stopRecording() : startRecording());
 // expose recording state for the watermark renderer in frame()
 window._isRecording = () => !!recorder;
+
+// Recording-quality segmented control — wired to state + license gate
+(function wireRecQuality(){
+  const seg = document.getElementById('recQualitySeg');
+  if(!seg) return;
+  function refresh(){
+    const licensed = !!state.noWatermark;
+    seg.querySelectorAll('button[data-pro]').forEach(b => {
+      b.classList.toggle('locked', !licensed);
+    });
+    const note = document.getElementById('recQualityNote');
+    if(note){
+      note.innerHTML = licensed
+        ? 'You are licensed — 1080p and 4K are available. 4K is heavy, fps may drop while recording.'
+        : 'Free accounts record at 720p. <a href="mailto:ai.allen.task@gmail.com" style="color:#c87cff">Contact</a> for 1080p / 4K license.';
+    }
+  }
+  seg.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      const isPro = b.dataset.pro != null;
+      if(isPro && !state.noWatermark){
+        // Free user hit a locked option — nudge to register
+        if(typeof window._openRegisterGate === 'function') window._openRegisterGate();
+        return;
+      }
+      seg.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      state.recordQuality = b.dataset.q;
+    });
+  });
+  refresh();
+  // re-render whenever license state changes (login / logout / token refresh)
+  window._onLicenseChange = ((prev) => () => { try { prev && prev(); } catch(_){} refresh(); })(window._onLicenseChange);
+})();
 
 /* —————————————————————————————————————————————————————————————————————
    Camera + MediaPipe (lazy-loaded)
@@ -8281,7 +8393,8 @@ function wireTypeSlider(id, fillId, thumbId, valId, key, fmt, scale){
 wireTypeSlider('typeSpeed','typeSpeedFill','typeSpeedThumb','typeSpeedVal','speed', v => v.toFixed(2)+'×', v => v/100);
 wireTypeSlider('typeSizeScale','typeSizeScaleFill','typeSizeScaleThumb','typeSizeScaleVal','sizeScale', v => v.toFixed(2)+'×', v => v/100);
 wireTypeSlider('typeWeight','typeWeightFill','typeWeightThumb','typeWeightVal','weight', v => String(v), v => v);
-wireTypeSlider('typeOutline','typeOutlineFill','typeOutlineThumb','typeOutlineVal','outlineWidth', v => (v/100).toFixed(2), v => v/100);
+// fmt receives the already-scaled value (typo.outlineWidth = raw/100), so just toFixed(2) directly.
+wireTypeSlider('typeOutline','typeOutlineFill','typeOutlineThumb','typeOutlineVal','outlineWidth', v => v.toFixed(2), v => v/100);
 
 // Custom RGB color picker for typography
 const typeColorPicker = document.getElementById('typeColorPicker');
