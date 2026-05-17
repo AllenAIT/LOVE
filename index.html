@@ -3667,7 +3667,12 @@ const lyrics = {
   linesPerSwitchFallback: 5,
   instrumentalGapSec: 4,
   instrumentalSwitchSec: 2.5,
+  // LRC doesn't have end times — each line is shown until the next line's time
+  // OR for at most maxLineDurationSec (whichever comes first). This prevents the
+  // last line from hanging on screen during long instrumental gaps.
+  maxLineDurationSec: 5,
   _lastGapSwitch: 0,
+  _lineShowing: false,
   meta: null,             // { trackName, artistName }
 };
 
@@ -3742,8 +3747,14 @@ async function fetchLyricsFromQuery(query){
 
 function loadLyricsFromLRC(lrcText, meta){
   const lines = parseLRC(lrcText);
-  if(!lines.length) return false;
+  console.log('[IW] parseLRC: parsed', lines.length, 'lines from', (lrcText||'').length, 'chars');
+  if(!lines.length){
+    console.warn('[IW] parseLRC: no lines parsed. Format expected [mm:ss.xx]text. Sample:', (lrcText||'').slice(0,200));
+    return false;
+  }
   detectSections(lines);
+  const chorus = lines.filter(l => l.section === 'chorus').length;
+  console.log('[IW] lyrics loaded:', lines.length, 'lines ·', chorus, 'chorus · first @', lines[0].time, 'sec · last @', lines[lines.length-1].time, 'sec');
   lyrics.lines = lines;
   lyrics.currentIdx = -1;
   lyrics.currentSection = null;
@@ -3760,13 +3771,24 @@ function clearLyrics(){
   lyrics.currentSection = null;
 }
 
+// Clear any lyric currently displayed (for long instrumental gaps + end of song).
+function _clearLyricFromTypo(){
+  if(typeof typo === 'undefined') return;
+  typo.text = '';
+  typo.centerCurrent = null;
+  if(Array.isArray(typo.spawns)) typo.spawns.length = 0;
+}
+
 // Drive the existing Typography system with one lyric line.
 // Respects the user's Type tab choices (anim, style, color, weight, font, kaleido).
 // Disables auto-spawn so lines don't stack across timings.
 function _applyLyricToTypo(text){
   if(typeof typo === 'undefined') return;
+  text = (text || '').trim();
+  console.log('[IW] lyrics line:', text || '(empty)');
+  if(!text){ return; }
   // Phrase pool = just this line (used by spawn-based anims)
-  typo.text = text || '';
+  typo.text = text;
   // morphCenter / typewriter — drive center text directly, never auto-swap
   typo.centerCurrent = text;
   typo.centerSwapT = (state.t/1000) + 999999;
@@ -3774,17 +3796,33 @@ function _applyLyricToTypo(text){
   // Clear stacked spawns so a long line doesn't pile up on a short one
   if(Array.isArray(typo.spawns)) typo.spawns.length = 0;
   typo.spawnAcc = 0;
-  // For spawn-based anims, drop ONE word with the new text using the user's style
+  // For spawn-based anims, drop ONE word with the new text using the user's style.
+  // For multi-word anims (popIn / rain / scatter), spawn a few more so screen
+  // doesn't look empty.
   if(typeof spawnWord === 'function'){
-    try { spawnWord(text); } catch(_){}
+    try {
+      const burst = (typo.anim === 'popIn' || typo.anim === 'rain' || typo.layout === 'scatter') ? 3 : 1;
+      for(let i=0;i<burst;i++) spawnWord(text);
+    } catch(err){ console.warn('[IW] spawnWord failed:', err); }
   }
   // Force typography mode on so the line is visible
   if(!state.modes.typography){
     state.modes.typography = true;
     const cb = document.querySelector('#modes input[data-mode="typography"]');
     if(cb) cb.checked = true;
+    console.log('[IW] auto-enabled typography mode for lyrics');
   }
 }
+
+// Re-spawn current line so font/color/anim change is visible immediately
+// (without waiting for next lyric line).
+function _refreshLyricLine(){
+  if(typeof lyrics === 'undefined' || !lyrics.enabled) return;
+  const idx = lyrics.currentIdx;
+  if(idx < 0 || !lyrics.lines[idx]) return;
+  _applyLyricToTypo(lyrics.lines[idx].text);
+}
+window._refreshLyricLine = _refreshLyricLine;
 
 // Called from the main frame loop. Reads audio.currentTime from the reactor's
 // media element, finds the current line, fires section-transition + fallback
@@ -3801,6 +3839,20 @@ function tickLyricsSync(){
     if(lyrics.lines[i].time <= t) idx = i; else break;
   }
 
+  // Clear stale line if we've stayed on the same line past its max duration.
+  // (LRC has no end times — we estimate end = min(next.time, line.time + maxDur).)
+  if(lyrics._lineShowing && lyrics.currentIdx >= 0){
+    const cur = lyrics.lines[lyrics.currentIdx];
+    const nxt = lyrics.lines[lyrics.currentIdx + 1];
+    const lineEnd = nxt
+      ? Math.min(nxt.time, cur.time + lyrics.maxLineDurationSec)
+      : cur.time + lyrics.maxLineDurationSec;
+    if(t > lineEnd){
+      _clearLyricFromTypo();
+      lyrics._lineShowing = false;
+    }
+  }
+
   if(idx !== lyrics.currentIdx){
     lyrics.currentIdx = idx;
     if(idx >= 0){
@@ -3808,6 +3860,7 @@ function tickLyricsSync(){
       // Drive the Typography system with this line. User's Type-tab choices
       // (anim, style, color, weight, font) all apply.
       _applyLyricToTypo(line.text);
+      lyrics._lineShowing = true;
       // Section transition → trigger random
       if(line.section && line.section !== lyrics.currentSection){
         const wasFirstLine = lyrics.currentSection === null;
