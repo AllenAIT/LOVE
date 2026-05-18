@@ -1926,7 +1926,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-18a · HUD always-on + error surface');
+console.log('[IW] script booting · build 2026-05-18b · typo guards in tickLyricsSync');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -3974,9 +3974,11 @@ window._lyricsStatus = function(){
 // media element, finds the current line, fires section-transition + fallback
 // triggers, and pushes the current text into typography mode.
 function tickLyricsSync(){
-  if(!lyrics.enabled || !lyrics.lines.length) return;
+  if(typeof lyrics === 'undefined' || !lyrics.enabled || !lyrics.lines.length) return;
+  if(typeof reactor === 'undefined') return;
   const el = reactor.mediaEl;
   if(!el || el.paused) return;
+  if(typeof typo === 'undefined') return;  // guard for any typo.x access below
   const t = el.currentTime;
 
   // Find current line (last line whose time ≤ t)
