@@ -1926,7 +1926,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-17h · HUD shows typo.text');
+console.log('[IW] script booting · build 2026-05-18a · HUD always-on + error surface');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -2648,6 +2648,9 @@ function frame(now){
     try { tickLyricsSync(); }
     catch(err){
       console.warn('[IW] tickLyricsSync error (auto-disabled):', err);
+      // Surface the failure in the HUD so the user can see *why* sync stopped,
+      // instead of silently disabling.
+      window._lyricsLastError = (err && err.message) ? err.message : String(err);
       if(typeof lyrics !== 'undefined') lyrics.enabled = false;
     }
   }
@@ -3816,27 +3819,35 @@ function _ensureLyricsHUD(){
 }
 function _updateLyricsHUD(){
   try {
-    if(typeof lyrics === 'undefined' || !lyrics.enabled || !lyrics.lines.length){
-      const h = document.getElementById('lyricsSyncHUD');
-      if(h) h.style.display = 'none';
-      return;
-    }
     const el = _ensureLyricsHUD();
+    // Always-on HUD so we can diagnose disable-loop / load failures.
+    const haveLyrics = (typeof lyrics !== 'undefined');
+    const enabled = haveLyrics && lyrics.enabled;
+    const nLines = haveLyrics ? lyrics.lines.length : 0;
     const ar = typeof reactor !== 'undefined' ? reactor.mediaEl : null;
     const t = ar ? ar.currentTime : 0;
     const paused = ar ? ar.paused : true;
-    const idx = lyrics.currentIdx;
-    const next = lyrics.lines[idx + 1];
+    const idx = haveLyrics ? lyrics.currentIdx : -1;
+    const next = haveLyrics && lyrics.lines[idx + 1];
     const nextIn = next ? Math.max(0, next.time - t).toFixed(1) + 's' : '—';
     const tt = (typeof typo !== 'undefined' && typo.text) ? typo.text.slice(0, 40) : '(empty)';
     const tmode = (typeof state !== 'undefined' && state.modes && state.modes.typography) ? 'ON' : 'OFF';
-    const showing = lyrics._lineShowing ? 'SHOW' : 'idle';
+    const showing = haveLyrics && lyrics._lineShowing ? 'SHOW' : 'idle';
+    const err = window._lyricsLastError || '';
     el.textContent =
-      `♪ ${paused ? 'PAUSED' : 'PLAY'} ${t.toFixed(2)}s · line ${idx+1}/${lyrics.lines.length} · next ${nextIn} · ${showing}\n` +
+      `lyrics.enabled=${enabled} · lines=${nLines}\n` +
+      `♪ ${paused ? 'PAUSED' : 'PLAY'} ${t.toFixed(2)}s · line ${idx+1}/${nLines} · next ${nextIn} · ${showing}\n` +
       `typography mode: ${tmode}\n` +
-      `typo.text = "${tt}"`;
+      `typo.text = "${tt}"` +
+      (err ? `\n⚠ ${err}` : '');
+    el.style.color = err ? '#ff7a9c' : (enabled ? '#9bd3a7' : '#ffcc22');
     el.style.display = 'block';
-  } catch(_){}
+  } catch(err){
+    try {
+      const el = document.getElementById('lyricsSyncHUD');
+      if(el){ el.textContent = '⚠ HUD error: ' + (err && err.message || err); el.style.display = 'block'; }
+    } catch(_){}
+  }
 }
 setInterval(_updateLyricsHUD, 250);
 // Remove any stale caption element from earlier builds
