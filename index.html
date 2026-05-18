@@ -1936,7 +1936,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-18o · gap auto-switch back (type locked)');
+console.log('[IW] script booting · build 2026-05-18p · pause gap auto-switch during recording');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -4106,8 +4106,12 @@ function tickLyricsSync(){
   // Instrumental-gap auto-switching: while in a long gap, fire randomizeAll
   // every `instrumentalSwitchSec` seconds — but temporarily lock the type tab
   // so the user's typography choices stay intact. Only visuals shuffle.
+  // SKIP during recording — randomizeAll is heavy (reset fields/particles +
+  // 50+ param randomizations + syncAllUI dispatch events) and causes the
+  // periodic frame hitch users notice in their recordings.
+  const _recording = typeof window._isRecording === 'function' && window._isRecording();
   const next = _lyrics.lines[_lyrics.currentIdx + 1];
-  if(next){
+  if(next && !_recording){
     const gap = next.time - t;
     if(gap > _lyrics.instrumentalGapSec){
       const now = performance.now() / 1000;
