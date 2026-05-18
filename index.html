@@ -1926,7 +1926,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-18c · Plan A: typography locked while lyrics on');
+console.log('[IW] script booting · build 2026-05-18d · tick diagnostics + visible lock badge');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -3834,9 +3834,12 @@ function _updateLyricsHUD(){
     const tmode = (typeof state !== 'undefined' && state.modes && state.modes.typography) ? 'ON' : 'OFF';
     const showing = haveLyrics && lyrics._lineShowing ? 'SHOW' : 'idle';
     const err = window._lyricsLastError || '';
+    const firstLine = (haveLyrics && lyrics.lines[0]) ? lyrics.lines[0].text.slice(0, 22) : '—';
+    const tickInfo = `tick=${window._tickCount || 0} stage=${window._tickStage || '?'} foundIdx=${window._tickFoundIdx ?? '?'}`;
     el.textContent =
-      `lyrics.enabled=${enabled} · lines=${nLines}\n` +
-      `♪ ${paused ? 'PAUSED' : 'PLAY'} ${t.toFixed(2)}s · line ${idx+1}/${nLines} · next ${nextIn} · ${showing}\n` +
+      `lyrics.enabled=${enabled} · lines=${nLines} · first="${firstLine}"\n` +
+      `♪ ${paused ? 'PAUSED' : 'PLAY'} ${t.toFixed(2)}s · stored idx=${idx} · ${showing}\n` +
+      `${tickInfo}\n` +
       `typography mode: ${tmode}\n` +
       `typo.text = "${tt}"` +
       (err ? `\n⚠ ${err}` : '');
@@ -3851,30 +3854,48 @@ function _updateLyricsHUD(){
 }
 // Plan A: when lyrics sync is active, force Typography mode ON and lock its
 // checkbox so the user can't accidentally turn the only lyric-renderer off.
+// Also shows a visible status badge inside the Lyrics panel.
 function _syncTypographyLockToLyrics(){
   try {
     const cb = document.querySelector('#modes input[data-mode="typography"]');
-    if(!cb) return;
     const haveLyrics = (typeof lyrics !== 'undefined');
     const shouldLock = haveLyrics && lyrics.enabled && lyrics.lines.length > 0;
-    const chip = cb.closest('.mode-chip') || cb.parentElement;
-    if(shouldLock){
-      if(!cb.checked) cb.checked = true;
-      if(!cb.disabled) cb.disabled = true;
-      if(typeof state !== 'undefined' && state.modes) state.modes.typography = true;
-      if(chip){
-        chip.title = 'Typography locked ON — Lyrics sync is using this layer';
-        chip.style.opacity = '0.85';
-        chip.dataset.lyricLocked = '1';
+    if(cb){
+      const chip = cb.closest('.mode-chip') || cb.parentElement;
+      if(shouldLock){
+        if(!cb.checked) cb.checked = true;
+        if(!cb.disabled) cb.disabled = true;
+        if(typeof state !== 'undefined' && state.modes) state.modes.typography = true;
+        if(chip){
+          chip.title = 'Typography locked ON — Lyrics sync is using this layer';
+          chip.style.opacity = '0.85';
+          chip.dataset.lyricLocked = '1';
+        }
+      } else if(chip && chip.dataset.lyricLocked === '1'){
+        cb.disabled = false;
+        chip.title = '';
+        chip.style.opacity = '';
+        delete chip.dataset.lyricLocked;
       }
-    } else if(chip && chip.dataset.lyricLocked === '1'){
-      // unlock only if we were the ones that locked it
-      cb.disabled = false;
-      chip.title = '';
-      chip.style.opacity = '';
-      delete chip.dataset.lyricLocked;
     }
-  } catch(_){}
+    // Also render a visible badge inside the Lyrics section so the user sees
+    // the lock state without switching to the Modes panel.
+    let badge = document.getElementById('lyricsLockBadge');
+    const statusEl = document.getElementById('lyricsStatus');
+    if(shouldLock){
+      if(!badge && statusEl && statusEl.parentElement){
+        badge = document.createElement('div');
+        badge.id = 'lyricsLockBadge';
+        badge.style.cssText = 'margin:6px 0;padding:6px 10px;border-radius:7px;background:rgba(155,211,167,.08);border:1px solid rgba(155,211,167,.25);color:#9bd3a7;font-family:var(--sans);font-size:11px;letter-spacing:.06em';
+        statusEl.parentElement.insertBefore(badge, statusEl);
+      }
+      if(badge) badge.textContent = '🔒 Typography mode locked · Type tab now controls lyric style';
+    } else if(badge){
+      badge.remove();
+    }
+  } catch(err){
+    console.warn('[IW] lock sync error:', err);
+  }
 }
 setInterval(() => { _updateLyricsHUD(); _syncTypographyLockToLyrics(); }, 250);
 // Remove any stale caption element from earlier builds
@@ -4001,18 +4022,23 @@ window._lyricsStatus = function(){
 // media element, finds the current line, fires section-transition + fallback
 // triggers, and pushes the current text into typography mode.
 function tickLyricsSync(){
-  if(typeof lyrics === 'undefined' || !lyrics.enabled || !lyrics.lines.length) return;
-  if(typeof reactor === 'undefined') return;
+  window._tickStage = 'entry';
+  if(typeof lyrics === 'undefined' || !lyrics.enabled || !lyrics.lines.length){ window._tickStage = 'skip-no-lyrics'; return; }
+  if(typeof reactor === 'undefined'){ window._tickStage = 'skip-no-reactor'; return; }
   const el = reactor.mediaEl;
-  if(!el || el.paused) return;
-  if(typeof typo === 'undefined') return;  // guard for any typo.x access below
+  if(!el){ window._tickStage = 'skip-no-mediaEl'; return; }
+  if(el.paused){ window._tickStage = 'skip-paused'; return; }
+  if(typeof typo === 'undefined'){ window._tickStage = 'skip-no-typo'; return; }
   const t = el.currentTime;
+  window._tickCount = (window._tickCount || 0) + 1;
+  window._tickStage = 'running t=' + t.toFixed(2);
 
   // Find current line (last line whose time ≤ t)
   let idx = -1;
   for(let i=0; i<lyrics.lines.length; i++){
     if(lyrics.lines[i].time <= t) idx = i; else break;
   }
+  window._tickFoundIdx = idx;
 
   // Clear stale line if we've stayed on the same line past its estimated end.
   // (LRC has no end times — we estimate end = min(next.time, line.time + est).)
