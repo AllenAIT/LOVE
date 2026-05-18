@@ -1926,7 +1926,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-18e · cross-scope via window');
+console.log('[IW] script booting · build 2026-05-18f · no auto-disappear + no random fire');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -3908,12 +3908,12 @@ setInterval(() => { _updateLyricsHUD(); _syncTypographyLockToLyrics(); }, 250);
 // Immediate cut — wipes spawned words, center text, and typewriter state so the
 // screen goes blank as soon as the line is "done". Also hides the DOM caption.
 function _clearLyricFromTypo(){
-  if(typeof typo === 'undefined') return;
-  typo.text = '';
-  typo.centerCurrent = null;
-  typo._tw = null;
-  if(Array.isArray(typo.spawns)) typo.spawns.length = 0;
-  _setLyricCaption('');
+  const _typo = (typeof typo !== 'undefined') ? typo : window.typo;
+  if(!_typo) return;
+  _typo.text = '';
+  _typo.centerCurrent = null;
+  _typo._tw = null;
+  if(Array.isArray(_typo.spawns)) _typo.spawns.length = 0;
 }
 
 // Estimate how long a lyric line should be shown given its text.
@@ -3937,21 +3937,18 @@ function _estimateLineDurationSec(text){
 // `durationSec`, when given, tightens the spawned word's lifetime so it fades out
 // exactly when the line is "done" — no lingering past the next line.
 function _applyLyricToTypo(text, durationSec){
-  if(typeof typo === 'undefined') return;
+  const _typo = (typeof typo !== 'undefined') ? typo : window.typo;
+  if(!_typo) return;
   text = (text || '').trim();
-  console.log('[IW] lyrics line:', text || '(empty)', durationSec != null ? `· ${durationSec.toFixed(2)}s` : '');
-  if(!text){ _setLyricCaption(''); return; }
-  // DOM caption — guaranteed visible subtitle, independent of canvas pipeline
-  _setLyricCaption(text);
-  // Phrase pool = just this line (used by spawn-based anims)
-  typo.text = text;
-  // morphCenter / typewriter — drive center text directly, never auto-swap
-  typo.centerCurrent = text;
-  typo.centerSwapT = (state.t/1000) + 999999;
-  typo._tw = null;  // reset typewriter so it re-starts on new line
-  // Clear stacked spawns so a long line doesn't pile up on a short one
-  if(Array.isArray(typo.spawns)) typo.spawns.length = 0;
-  typo.spawnAcc = 0;
+  console.log('[IW] lyrics line:', text || '(empty)');
+  if(!text) return;
+  _typo.text = text;
+  _typo.centerCurrent = text;
+  _typo.centerSize = null;  // re-pick from current sizeMode on next render
+  _typo.centerSwapT = ((typeof state !== 'undefined' ? state.t : 0)/1000) + 999999;
+  _typo._tw = null;
+  if(Array.isArray(_typo.spawns)) _typo.spawns.length = 0;
+  _typo.spawnAcc = 0;
   // For spawn-based anims, drop ONE word with the new text using the user's style.
   // For multi-word anims (popIn / rain / scatter), spawn a few more so screen
   // doesn't look empty.
@@ -4044,20 +4041,6 @@ function tickLyricsSync(){
   }
   window._tickFoundIdx = idx;
 
-  // Clear stale line if we've stayed on the same line past its estimated end.
-  if(_lyrics._lineShowing && _lyrics.currentIdx >= 0){
-    const cur = _lyrics.lines[_lyrics.currentIdx];
-    const nxt = _lyrics.lines[_lyrics.currentIdx + 1];
-    const est = _estimateLineDurationSec(cur.text);
-    const lineEnd = nxt
-      ? Math.min(nxt.time, cur.time + est)
-      : cur.time + est;
-    if(t > lineEnd){
-      _clearLyricFromTypo();
-      _lyrics._lineShowing = false;
-    }
-  }
-
   // Defensive: pin typo.text to current lyric
   if(_lyrics._lineShowing && _lyrics.currentIdx >= 0){
     const cur = _lyrics.lines[_lyrics.currentIdx];
@@ -4071,43 +4054,23 @@ function tickLyricsSync(){
     _lyrics.currentIdx = idx;
     if(idx >= 0){
       const line = _lyrics.lines[idx];
-      const nxt2 = _lyrics.lines[idx + 1];
-      const est2 = _estimateLineDurationSec(line.text);
-      const displayFor = nxt2
-        ? Math.max(0.4, Math.min(nxt2.time - line.time, est2))
-        : est2;
-      _applyLyricToTypo(line.text, displayFor);
+      // No auto-fade — line stays visible until the next line replaces it.
+      // (User asked to remove the "appear briefly then disappear" behavior.)
+      _applyLyricToTypo(line.text);
       _lyrics._lineShowing = true;
-      // Section transition → trigger random
+      // Section transition tracking — DO NOT fire randomizeAll here:
+      // the user wants Type tab choices to stay stable while lyrics play.
       if(line.section && line.section !== _lyrics.currentSection){
-        const wasFirstLine = _lyrics.currentSection === null;
         _lyrics.currentSection = line.section;
         _lyrics.linesSinceSwitch = 0;
-        if(!wasFirstLine && typeof randomizeAll === 'function'){
-          randomizeAll();
-        }
       } else {
         _lyrics.linesSinceSwitch++;
-        if(_lyrics.linesSinceSwitch >= _lyrics.linesPerSwitchFallback){
-          lyrics.linesSinceSwitch = 0;
-          if(typeof randomizeAll === 'function') randomizeAll();
-        }
+        // Counter kept for stats but no randomizeAll fire (user wants Type stable).
       }
     }
   }
-
-  // Instrumental gap detection
-  const next = _lyrics.lines[_lyrics.currentIdx + 1];
-  if(next){
-    const gap = next.time - t;
-    if(gap > _lyrics.instrumentalGapSec){
-      const now = performance.now() / 1000;
-      if(now - _lyrics._lastGapSwitch > _lyrics.instrumentalSwitchSec){
-        _lyrics._lastGapSwitch = now;
-        if(typeof randomizeAll === 'function') randomizeAll();
-      }
-    }
-  }
+  // Instrumental-gap random switching also disabled — user wants stable visuals
+  // while lyrics play. Re-enable if the user explicitly wants it later.
 }
 
 // ---- UI wiring ----
