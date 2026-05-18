@@ -1926,7 +1926,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-18b · typo guards in tickLyricsSync');
+console.log('[IW] script booting · build 2026-05-18c · Plan A: typography locked while lyrics on');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -3849,7 +3849,34 @@ function _updateLyricsHUD(){
     } catch(_){}
   }
 }
-setInterval(_updateLyricsHUD, 250);
+// Plan A: when lyrics sync is active, force Typography mode ON and lock its
+// checkbox so the user can't accidentally turn the only lyric-renderer off.
+function _syncTypographyLockToLyrics(){
+  try {
+    const cb = document.querySelector('#modes input[data-mode="typography"]');
+    if(!cb) return;
+    const haveLyrics = (typeof lyrics !== 'undefined');
+    const shouldLock = haveLyrics && lyrics.enabled && lyrics.lines.length > 0;
+    const chip = cb.closest('.mode-chip') || cb.parentElement;
+    if(shouldLock){
+      if(!cb.checked) cb.checked = true;
+      if(!cb.disabled) cb.disabled = true;
+      if(typeof state !== 'undefined' && state.modes) state.modes.typography = true;
+      if(chip){
+        chip.title = 'Typography locked ON — Lyrics sync is using this layer';
+        chip.style.opacity = '0.85';
+        chip.dataset.lyricLocked = '1';
+      }
+    } else if(chip && chip.dataset.lyricLocked === '1'){
+      // unlock only if we were the ones that locked it
+      cb.disabled = false;
+      chip.title = '';
+      chip.style.opacity = '';
+      delete chip.dataset.lyricLocked;
+    }
+  } catch(_){}
+}
+setInterval(() => { _updateLyricsHUD(); _syncTypographyLockToLyrics(); }, 250);
 // Remove any stale caption element from earlier builds
 (function _removeStaleCaption(){
   const el = document.getElementById('lyricsCaptionOverlay');
