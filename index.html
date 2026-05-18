@@ -1926,7 +1926,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-18f · no auto-disappear + no random fire');
+console.log('[IW] script booting · build 2026-05-18g · long-text fit + Type→lyric live refresh + Random respawns');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -3974,15 +3974,17 @@ function _applyLyricToTypo(text, durationSec){
   }
 }
 
-// Re-spawn current line so font/color/anim change is visible immediately
-// (without waiting for next lyric line).
+// Re-spawn current line so font/color/anim/size/style change is visible immediately
+// (without waiting for next lyric line). Called from Type tab event handlers + Random.
 function _refreshLyricLine(){
-  if(typeof lyrics === 'undefined' || !lyrics.enabled) return;
-  const idx = lyrics.currentIdx;
-  if(idx < 0 || !lyrics.lines[idx]) return;
-  _applyLyricToTypo(lyrics.lines[idx].text);
+  const _lyrics = (typeof lyrics !== 'undefined') ? lyrics : window.lyrics;
+  if(!_lyrics || !_lyrics.enabled) return;
+  const idx = _lyrics.currentIdx;
+  if(idx < 0 || !_lyrics.lines[idx]) return;
+  _applyLyricToTypo(_lyrics.lines[idx].text);
 }
 window._refreshLyricLine = _refreshLyricLine;
+window._refreshLyricCaption = _refreshLyricLine;  // alias for old hook name
 
 // ── DIAGNOSTIC helpers exposed on window for manual debugging in console ──
 //
@@ -6452,6 +6454,11 @@ function randomizeAll(){
   if(lmCb) lmCb.checked = !!state.lightMode;
 
   syncAllUI();
+  // If lyrics is active, re-render the current line so randomized typo settings
+  // (anim/style/color/weight) apply immediately to the lyric on canvas.
+  if(typeof window._refreshLyricLine === 'function'){
+    try { window._refreshLyricLine(); } catch(_){}
+  }
 }
 randTop.addEventListener('click', randomizeAll);
 
@@ -9094,7 +9101,12 @@ function drawTypography(g, dt, T){
     let len;
     if(typo._tw.dir > 0){
       len = Math.min(total, Math.floor(sec*cps));
-      if(len >= total && sec > total/cps + 1.0){ typo._tw.dir = -1; typo._tw.t0 = t0; }
+      // In lyrics mode: type once then hold (no reverse). _tw resets on next line.
+      if(_lyricsActive){
+        // never flip direction; len caps at total
+      } else if(len >= total && sec > total/cps + 1.0){
+        typo._tw.dir = -1; typo._tw.t0 = t0;
+      }
     } else {
       len = Math.max(0, total - Math.floor(sec*cps));
       if(len <= 0){
@@ -9103,7 +9115,8 @@ function drawTypography(g, dt, T){
         len = 0;
       }
     }
-    const text = typo._tw.phrase.slice(0, len) + (Math.floor(sec*4)%2 ? '_' : ' ');
+    const showCursor = !_lyricsActive || len < total;
+    const text = typo._tw.phrase.slice(0, len) + (showCursor && Math.floor(sec*4)%2 ? '_' : ' ');
     drawCenteredText(g, text, 0.92, 1, typo._tw.size);
     return;
   }
@@ -9223,6 +9236,14 @@ function drawTypography(g, dt, T){
     g.globalAlpha = Math.max(0, alpha);
     g.fillStyle = w.color;
     g.font = `${pickWeight(w)} ${w.size}px ${fontStack()}`;
+    // Auto-fit: shrink size if text would exceed canvas width
+    let _renderSize = w.size;
+    const _maxW = W * 0.92;
+    const _m = g.measureText(w.text);
+    if(_m.width > _maxW){
+      _renderSize *= _maxW / _m.width;
+      g.font = `${pickWeight(w)} ${_renderSize}px ${fontStack()}`;
+    }
     g.textAlign = w.align;
     g.textBaseline = 'middle';
     g.save();
@@ -9252,7 +9273,7 @@ function drawTypography(g, dt, T){
       g.stroke();
       g.restore();
     }
-    renderStyledText(g, w.text, 0, 0, w.size, w.color, w.outlineSpawn);
+    renderStyledText(g, w.text, 0, 0, _renderSize, w.color, w.outlineSpawn);
     g.restore();
   }
   g.restore();
@@ -9264,11 +9285,18 @@ function pickWeight(w){
 function easeOutBack(t){ const c1=1.70158, c3=c1+1; return 1 + c3*Math.pow(t-1,3) + c1*Math.pow(t-1,2); }
 
 function drawCenteredText(g, text, alpha, pulse, sizeOverride){
-  const sz = sizeOverride || pickSizeFromMode();
+  let sz = sizeOverride || pickSizeFromMode();
   g.save();
+  g.font = `${typo.weight || 500} ${sz}px ${fontStack()}`;
+  // Auto-fit: shrink size so the text fits within 92% of canvas width
+  const maxW = W * 0.92;
+  const m = g.measureText(text);
+  if(m.width > maxW){
+    sz *= maxW / m.width;
+    g.font = `${typo.weight || 500} ${sz}px ${fontStack()}`;
+  }
   g.globalAlpha = alpha;
   g.fillStyle = pickColor();
-  g.font = `500 ${sz}px ${fontStack()}`;
   g.textAlign = 'center'; g.textBaseline = 'middle';
   renderStyledText(g, text, CX, CY, sz, g.fillStyle, false);
   // soft glow
@@ -9400,14 +9428,25 @@ wireTypeSlider('typeLife','typeLifeFill','typeLifeThumb','typeLifeVal','life', v
 wireTypeSlider('typeDens','typeDensFill','typeDensThumb','typeDensVal','density', v => v.toFixed(2),   v => v/100);
 $('typeLoop').addEventListener('change', e => { typo.loop = e.target.checked; });
 
-// Whenever any Type tab control changes, sync the lyric caption styling
-// immediately (don't wait for the next 200ms poll or the next lyric line).
-(function _wireTypeCaptionLiveSync(){
+// Whenever any Type tab control changes, re-render the current lyric line so the
+// new font/anim/size/style/etc. is immediately visible. Throttled so dragging
+// sliders doesn't cause flicker from constant respawning.
+(function _wireTypeLiveLyricsRefresh(){
   const typeTab = document.querySelector('section.tab[data-tab="type"]') || document.body;
-  const sync = () => { if(typeof window._refreshLyricCaption === 'function') window._refreshLyricCaption(); };
-  typeTab.addEventListener('click', sync, true);
-  typeTab.addEventListener('input', sync, true);
-  typeTab.addEventListener('change', sync, true);
+  let pending = false;
+  const trigger = () => {
+    if(pending) return;
+    pending = true;
+    setTimeout(() => {
+      pending = false;
+      if(typeof window._refreshLyricLine === 'function'){
+        try { window._refreshLyricLine(); } catch(_){}
+      }
+    }, 120);
+  };
+  typeTab.addEventListener('click', trigger, true);
+  typeTab.addEventListener('input', trigger, true);
+  typeTab.addEventListener('change', trigger, true);
 })();
 
 /* —————————————————————————————————————————————————————————————————————
