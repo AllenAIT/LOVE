@@ -1926,7 +1926,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-18d · tick diagnostics + visible lock badge');
+console.log('[IW] script booting · build 2026-05-18e · cross-scope via window');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -3665,7 +3665,7 @@ window._audioData = reactor;
 // verse/chorus by repetition analysis, triggers random visuals on
 // section transitions + instrumental gaps.
 // ============================================================
-const lyrics = {
+const lyrics = window.lyrics = {
   enabled: false,
   lines: [],              // [{ time, text, section }]
   currentIdx: -1,
@@ -4023,76 +4023,72 @@ window._lyricsStatus = function(){
 // triggers, and pushes the current text into typography mode.
 function tickLyricsSync(){
   window._tickStage = 'entry';
-  if(typeof lyrics === 'undefined' || !lyrics.enabled || !lyrics.lines.length){ window._tickStage = 'skip-no-lyrics'; return; }
-  if(typeof reactor === 'undefined'){ window._tickStage = 'skip-no-reactor'; return; }
-  const el = reactor.mediaEl;
+  // Resolve everything through window in case closure scope failed to bind
+  const _lyrics = (typeof lyrics !== 'undefined') ? lyrics : window.lyrics;
+  const _reactor = (typeof reactor !== 'undefined') ? reactor : window.reactor;
+  const _typo = (typeof typo !== 'undefined') ? typo : window.typo;
+  if(!_lyrics || !_lyrics.enabled || !_lyrics.lines.length){ window._tickStage = 'skip-no-lyrics'; return; }
+  if(!_reactor){ window._tickStage = 'skip-no-reactor'; return; }
+  const el = _reactor.mediaEl;
   if(!el){ window._tickStage = 'skip-no-mediaEl'; return; }
   if(el.paused){ window._tickStage = 'skip-paused'; return; }
-  if(typeof typo === 'undefined'){ window._tickStage = 'skip-no-typo'; return; }
+  if(!_typo){ window._tickStage = 'skip-no-typo'; return; }
   const t = el.currentTime;
   window._tickCount = (window._tickCount || 0) + 1;
   window._tickStage = 'running t=' + t.toFixed(2);
 
   // Find current line (last line whose time ≤ t)
   let idx = -1;
-  for(let i=0; i<lyrics.lines.length; i++){
-    if(lyrics.lines[i].time <= t) idx = i; else break;
+  for(let i=0; i<_lyrics.lines.length; i++){
+    if(_lyrics.lines[i].time <= t) idx = i; else break;
   }
   window._tickFoundIdx = idx;
 
   // Clear stale line if we've stayed on the same line past its estimated end.
-  // (LRC has no end times — we estimate end = min(next.time, line.time + est).)
-  if(lyrics._lineShowing && lyrics.currentIdx >= 0){
-    const cur = lyrics.lines[lyrics.currentIdx];
-    const nxt = lyrics.lines[lyrics.currentIdx + 1];
+  if(_lyrics._lineShowing && _lyrics.currentIdx >= 0){
+    const cur = _lyrics.lines[_lyrics.currentIdx];
+    const nxt = _lyrics.lines[_lyrics.currentIdx + 1];
     const est = _estimateLineDurationSec(cur.text);
     const lineEnd = nxt
       ? Math.min(nxt.time, cur.time + est)
       : cur.time + est;
     if(t > lineEnd){
       _clearLyricFromTypo();
-      lyrics._lineShowing = false;
+      _lyrics._lineShowing = false;
     }
   }
 
-  // Defensive: while a line is showing, keep typo.text pinned to that line so
-  // any other code path that touches typo.text (typeText reset, simulator,
-  // randomizer) can't smuggle the default phrases back onto the canvas.
-  if(lyrics._lineShowing && lyrics.currentIdx >= 0){
-    const cur = lyrics.lines[lyrics.currentIdx];
-    if(cur && typo.text !== cur.text){
-      typo.text = cur.text;
-      typo.centerCurrent = cur.text;
+  // Defensive: pin typo.text to current lyric
+  if(_lyrics._lineShowing && _lyrics.currentIdx >= 0){
+    const cur = _lyrics.lines[_lyrics.currentIdx];
+    if(cur && _typo.text !== cur.text){
+      _typo.text = cur.text;
+      _typo.centerCurrent = cur.text;
     }
   }
 
-  if(idx !== lyrics.currentIdx){
-    lyrics.currentIdx = idx;
+  if(idx !== _lyrics.currentIdx){
+    _lyrics.currentIdx = idx;
     if(idx >= 0){
-      const line = lyrics.lines[idx];
-      const nxt2 = lyrics.lines[idx + 1];
+      const line = _lyrics.lines[idx];
+      const nxt2 = _lyrics.lines[idx + 1];
       const est2 = _estimateLineDurationSec(line.text);
       const displayFor = nxt2
         ? Math.max(0.4, Math.min(nxt2.time - line.time, est2))
         : est2;
-      // Drive the Typography system with this line. User's Type-tab choices
-      // (anim, style, color, weight, font) all apply.
-      // displayFor tightens spawn lifetime so the word fades at line end.
       _applyLyricToTypo(line.text, displayFor);
-      lyrics._lineShowing = true;
+      _lyrics._lineShowing = true;
       // Section transition → trigger random
-      if(line.section && line.section !== lyrics.currentSection){
-        const wasFirstLine = lyrics.currentSection === null;
-        lyrics.currentSection = line.section;
-        lyrics.linesSinceSwitch = 0;
-        // Don't trigger random on the very first line (user just hit play)
+      if(line.section && line.section !== _lyrics.currentSection){
+        const wasFirstLine = _lyrics.currentSection === null;
+        _lyrics.currentSection = line.section;
+        _lyrics.linesSinceSwitch = 0;
         if(!wasFirstLine && typeof randomizeAll === 'function'){
           randomizeAll();
         }
       } else {
-        // Same section — count toward fallback
-        lyrics.linesSinceSwitch++;
-        if(lyrics.linesSinceSwitch >= lyrics.linesPerSwitchFallback){
+        _lyrics.linesSinceSwitch++;
+        if(_lyrics.linesSinceSwitch >= _lyrics.linesPerSwitchFallback){
           lyrics.linesSinceSwitch = 0;
           if(typeof randomizeAll === 'function') randomizeAll();
         }
@@ -4100,15 +4096,14 @@ function tickLyricsSync(){
     }
   }
 
-  // Instrumental gap detection — if gap to next line > threshold, fire random
-  // every instrumentalSwitchSec seconds while waiting.
-  const next = lyrics.lines[lyrics.currentIdx + 1];
+  // Instrumental gap detection
+  const next = _lyrics.lines[_lyrics.currentIdx + 1];
   if(next){
     const gap = next.time - t;
-    if(gap > lyrics.instrumentalGapSec){
+    if(gap > _lyrics.instrumentalGapSec){
       const now = performance.now() / 1000;
-      if(now - lyrics._lastGapSwitch > lyrics.instrumentalSwitchSec){
-        lyrics._lastGapSwitch = now;
+      if(now - _lyrics._lastGapSwitch > _lyrics.instrumentalSwitchSec){
+        _lyrics._lastGapSwitch = now;
         if(typeof randomizeAll === 'function') randomizeAll();
       }
     }
@@ -8961,7 +8956,9 @@ const FONT = {
 };
 const PALETTE = ['#f3eee6','#ffffff','#c87cff','#7fdcff','#9bd3a7','#ffb27a','#ff7a9c','#7a6bff'];
 
-const typo = {
+// Cross-scope bridge — closure scope sometimes fails to resolve `typo` from
+// inside callbacks fired by setInterval / rAF; expose to window as authoritative.
+const typo = window.typo = {
   text: '輕呼吸 / breathe / 静か / 한 호흡 / 一念',
   phrases: () => typo.text.split('/').map(s => s.trim()).filter(Boolean),
   family: 'sans',
