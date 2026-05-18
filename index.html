@@ -1577,6 +1577,11 @@
             <button class="audio-btn" id="lyricsToggle" style="flex:1">Sync off</button>
             <button class="audio-btn danger" id="lyricsClear" title="Clear loaded lyrics">✕ clear</button>
           </div>
+          <div class="ctrl"><span class="label">Line display max (sec) · VJ gap control</span><span class="val" id="lyricsMaxDurVal">4s</span>
+            <div class="slider"><div class="track"></div><div class="fill" id="lyricsMaxDurFill"></div><div class="thumb" id="lyricsMaxDurThumb"></div>
+              <input type="range" min="1" max="30" value="4" id="lyricsMaxDur" />
+            </div>
+          </div>
           <div class="ctrl"><span class="label">Fallback: switch every N lines</span><span class="val" id="lyricsEveryVal">5</span>
             <div class="slider"><div class="track"></div><div class="fill" id="lyricsEveryFill"></div><div class="thumb" id="lyricsEveryThumb"></div>
               <input type="range" min="2" max="12" value="5" id="lyricsEvery" />
@@ -1926,7 +1931,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-18g · long-text fit + Type→lyric live refresh + Random respawns');
+console.log('[IW] script booting · build 2026-05-18h · VJ gap control + flicker fix');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -4043,7 +4048,23 @@ function tickLyricsSync(){
   }
   window._tickFoundIdx = idx;
 
-  // Defensive: pin typo.text to current lyric
+  // Clear-stale: if maxLineDurationSec < 30, line disappears after that many seconds
+  // so VJ has gap time to control visuals. 30+ = "until next line" (no gaps).
+  if(_lyrics._lineShowing && _lyrics.currentIdx >= 0){
+    const cur = _lyrics.lines[_lyrics.currentIdx];
+    const nxt = _lyrics.lines[_lyrics.currentIdx + 1];
+    const cap = _lyrics.maxLineDurationSec || 4;
+    const untilNext = cap >= 30;
+    const lineEnd = untilNext
+      ? (nxt ? nxt.time : Infinity)
+      : (nxt ? Math.min(nxt.time, cur.time + cap) : cur.time + cap);
+    if(t > lineEnd){
+      _clearLyricFromTypo();
+      _lyrics._lineShowing = false;
+    }
+  }
+
+  // Defensive: pin typo.text to current lyric (only while still showing)
   if(_lyrics._lineShowing && _lyrics.currentIdx >= 0){
     const cur = _lyrics.lines[_lyrics.currentIdx];
     if(cur && _typo.text !== cur.text){
@@ -7980,6 +8001,7 @@ if(state.silentOutput){
     };
     inp.addEventListener('input', upd); upd();
   }
+  wireLyricsSlider('lyricsMaxDur','lyricsMaxDurFill','lyricsMaxDurThumb','lyricsMaxDurVal', 'maxLineDurationSec', (v,raw)=> raw>=30 ? 'until next line' : v+'s');
   wireLyricsSlider('lyricsEvery','lyricsEveryFill','lyricsEveryThumb','lyricsEveryVal', 'linesPerSwitchFallback', (v)=>String(v));
   wireLyricsSlider('lyricsGap','lyricsGapFill','lyricsGapThumb','lyricsGapVal', 'instrumentalGapSec', (v)=>v+'s');
   wireLyricsSlider('lyricsGapInt','lyricsGapIntFill','lyricsGapIntThumb','lyricsGapIntVal', 'instrumentalSwitchSec', (v)=>v+'s', (raw)=>raw/10);
@@ -9122,11 +9144,14 @@ function drawTypography(g, dt, T){
   }
 
   // —— Spawn-based animations ——
-  // Auto-spawn from the current phrases pool. When lyrics is driving, that pool
-  // is [current lyric line], so the lyric stays continuously visible (and gets
-  // re-spawned so it doesn't fade out mid-line). Line end clears typo.text →
-  // phrases becomes [] → drawTypography early-returns above → no spawn.
-  if(typo.loop || typo.spawns.length === 0){
+  // When lyrics is driving: _applyLyricToTypo() seeded the spawns with a long-life
+  // word already; re-spawn only when the array is empty (e.g. anim change cleared
+  // it). This avoids the phase-reset flicker that came from constant respawning.
+  // When lyrics is OFF: normal auto-spawn cycle from the default phrase pool.
+  const _autoSpawnAllowed = _lyricsActive
+    ? (typo.spawns.length === 0)
+    : (typo.loop || typo.spawns.length === 0);
+  if(_autoSpawnAllowed){
     typo.spawnAcc += dts * sp;
     const need = 1 / Math.max(0.05, typo.rate);
     let safety = 8;
@@ -9428,26 +9453,16 @@ wireTypeSlider('typeLife','typeLifeFill','typeLifeThumb','typeLifeVal','life', v
 wireTypeSlider('typeDens','typeDensFill','typeDensThumb','typeDensVal','density', v => v.toFixed(2),   v => v/100);
 $('typeLoop').addEventListener('change', e => { typo.loop = e.target.checked; });
 
-// Whenever any Type tab control changes, re-render the current lyric line so the
-// new font/anim/size/style/etc. is immediately visible. Throttled so dragging
-// sliders doesn't cause flicker from constant respawning.
-(function _wireTypeLiveLyricsRefresh(){
-  const typeTab = document.querySelector('section.tab[data-tab="type"]') || document.body;
-  let pending = false;
-  const trigger = () => {
-    if(pending) return;
-    pending = true;
-    setTimeout(() => {
-      pending = false;
-      if(typeof window._refreshLyricLine === 'function'){
-        try { window._refreshLyricLine(); } catch(_){}
-      }
-    }, 120);
-  };
-  typeTab.addEventListener('click', trigger, true);
-  typeTab.addEventListener('input', trigger, true);
-  typeTab.addEventListener('change', trigger, true);
-})();
+// Type tab → lyric live update strategy:
+//  - color / style / weight / outline / kaleido: read by canvas at draw time,
+//    so changes are INSTANT without re-spawning.
+//  - sizeMode / family / lang / layout / sizeScale: take effect on the next
+//    auto-spawn cycle (~0.67s by default).
+//  - anim: handled by the existing #typeAnimGrid click handler that already
+//    clears spawns. No extra hook needed.
+// We deliberately do NOT call _refreshLyricLine() on every input event — that
+// caused flicker from clearing+respawning the word at slider drag speed.
+// The Random button still re-renders explicitly (handled where randomizeAll ends).
 
 /* —————————————————————————————————————————————————————————————————————
    Phrase library (localStorage) + typing simulator
