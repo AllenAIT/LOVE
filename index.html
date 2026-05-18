@@ -1931,7 +1931,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-18h · VJ gap control + flicker fix');
+console.log('[IW] script booting · build 2026-05-18j · MIXED size locked per line');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -3954,18 +3954,22 @@ function _applyLyricToTypo(text, durationSec){
   _typo._tw = null;
   if(Array.isArray(_typo.spawns)) _typo.spawns.length = 0;
   _typo.spawnAcc = 0;
-  // For spawn-based anims, drop ONE word with the new text using the user's style.
-  // For multi-word anims (popIn / rain / scatter), spawn a few more so screen
-  // doesn't look empty.
+  // Spawn the lyric word(s). Lyric spawns get a LONG life so they don't fade out
+  // mid-line and force an auto-spawn refill (which causes the visible flicker).
+  // tickLyricsSync clears spawns explicitly when the line ends or the next one
+  // begins — that's the only thing that should make the word disappear.
   if(typeof spawnWord === 'function'){
     try {
       const burst = (typo.anim === 'popIn' || typo.anim === 'rain' || typo.layout === 'scatter') ? 3 : 1;
       const before = typo.spawns.length;
       for(let i=0;i<burst;i++) spawnWord(text);
-      // Override word.life on the just-spawned word(s) so they vanish at line end.
-      if(durationSec != null && durationSec > 0){
+      const _lyricsActive = (typeof lyrics !== 'undefined' && lyrics.enabled);
+      const lifeOverride = (durationSec != null && durationSec > 0)
+        ? durationSec
+        : (_lyricsActive ? 9999 : null);  // huge so it doesn't die mid-line
+      if(lifeOverride != null){
         for(let i=before;i<typo.spawns.length;i++){
-          typo.spawns[i].life = durationSec;
+          typo.spawns[i].life = lifeOverride;
         }
       }
     } catch(err){ console.warn('[IW] spawnWord failed:', err); }
@@ -9099,15 +9103,17 @@ function drawTypography(g, dt, T){
   if(typo.anim === 'morphCenter'){
     const swapInterval = (3/Math.max(0.5,typo.rate)) / sp;
     if(!typo.centerCurrent){
-      // Seed from current phrases pool (when lyrics is driving, phrases = [lyric]).
       typo.centerCurrent = phrases[Math.floor(Math.random()*phrases.length)];
       typo.centerSwapT = t0 + swapInterval;
+    }
+    // Pick centerSize ONCE per line — MIXED otherwise re-rolls every frame.
+    if(typo.centerSize == null){
       typo.centerSize = pickSizeFromMode();
     }
     if(!_lyricsActive && t0 > typo.centerSwapT){
       typo.centerCurrent = phrases[Math.floor(Math.random()*phrases.length)];
       typo.centerSwapT = t0 + swapInterval;
-      typo.centerSize = pickSizeFromMode();   // re-roll size on swap
+      typo.centerSize = pickSizeFromMode();   // re-roll size on swap (non-lyrics)
     }
     const pulse = 0.5 + 0.5*Math.sin(t0*1.2*sp);
     drawCenteredText(g, typo.centerCurrent, 0.95 - (t0 - (typo.centerSwapT - swapInterval))*0.1, pulse, typo.centerSize);
@@ -9175,8 +9181,11 @@ function drawTypography(g, dt, T){
       if(typo.anim === 'rain' && w.y > H + w.size){ typo.spawns.splice(i,1); continue; }
     }
     const t01 = age / w.life;
-    const fadeIn = Math.min(1, t01*4);
-    const fadeOut = 1 - Math.max(0, (t01-0.8)/0.2);
+    // For long-life words (lyrics: life≈9999), use absolute-time fade-in so the
+    // word actually reaches full opacity in ~0.25s, and skip the proportional fade-out.
+    const longLife = w.life > 100;
+    const fadeIn = longLife ? Math.min(1, age*4) : Math.min(1, t01*4);
+    const fadeOut = longLife ? 1 : (1 - Math.max(0, (t01-0.8)/0.2));
     let alpha = Math.min(fadeIn, fadeOut);
     let dx = 0, dy = 0, scale = 1, rot = w.rot || 0;
 
