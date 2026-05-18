@@ -1931,7 +1931,7 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[IW] unhandled rejection:', e.reason && (e.reason.message || e.reason));
 });
-console.log('[IW] script booting · build 2026-05-18j · MIXED size locked per line');
+console.log('[IW] script booting · build 2026-05-18k · no auto-spawn churn during lyrics');
 
 // Click diagnostics — log every click so we can see where they reach.
 // Capture phase so we see clicks BEFORE any interceptor swallows them.
@@ -9150,14 +9150,11 @@ function drawTypography(g, dt, T){
   }
 
   // —— Spawn-based animations ——
-  // When lyrics is driving: _applyLyricToTypo() seeded the spawns with a long-life
-  // word already; re-spawn only when the array is empty (e.g. anim change cleared
-  // it). This avoids the phase-reset flicker that came from constant respawning.
-  // When lyrics is OFF: normal auto-spawn cycle from the default phrase pool.
-  const _autoSpawnAllowed = _lyricsActive
-    ? (typo.spawns.length === 0)
-    : (typo.loop || typo.spawns.length === 0);
-  if(_autoSpawnAllowed){
+  // When lyrics is driving, the word is seeded by _applyLyricToTypo with life=9999.
+  // Auto-spawn is fully disabled to avoid any churn — re-seeding only happens at
+  // line transitions / Random / Type-tab anim change (existing handlers clear spawns).
+  // When lyrics is OFF: normal auto-spawn cycle.
+  if(!_lyricsActive && (typo.loop || typo.spawns.length === 0)){
     typo.spawnAcc += dts * sp;
     const need = 1 / Math.max(0.05, typo.rate);
     let safety = 8;
@@ -9167,6 +9164,13 @@ function drawTypography(g, dt, T){
       spawnWord(phrase);
     }
     if(typo.spawnAcc > need*2) typo.spawnAcc = need;
+  } else if(_lyricsActive && typo.spawns.length === 0){
+    // Edge case: spawns got cleared (anim change handler does this) but no new
+    // line transitioned yet — re-seed from the current lyric immediately.
+    const phrase = phrases[Math.floor(Math.random()*phrases.length)];
+    spawnWord(phrase);
+    const last = typo.spawns[typo.spawns.length-1];
+    if(last) last.life = 9999;
   }
 
   g.save();
